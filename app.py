@@ -19,7 +19,7 @@ from streamlit_folium import st_folium
 
 sys.path.insert(0, os.path.dirname(__file__))
 from geocoder import geocode, extract_ward, extract_ward_with_suffix
-from map_generator import generate_map_png, _calc_zoom
+from map_generator import generate_map_png, _calc_zoom, TILE_PROVIDERS
 from nearby_search import search_nearby, format_nearby_list
 from doc_generator import (
     generate_sign_notice,
@@ -126,14 +126,25 @@ if detected_coords:
     st.subheader("地図プレビュー")
     st.caption("拡大・縮小・移動で調整してください。この表示範囲が書類の地図に反映されます。")
 
+    tile_choice = st.radio("地図の種類", list(TILE_PROVIDERS.keys()), horizontal=True, index=0)
+
     preview_lat, preview_lng = detected_coords
     preview_zoom = _calc_zoom(radius_m)
 
-    preview_map = folium.Map(
-        location=[preview_lat, preview_lng],
-        zoom_start=preview_zoom,
-        tiles="OpenStreetMap",
-    )
+    tile_info = TILE_PROVIDERS[tile_choice]
+    if tile_info["attr"]:
+        preview_map = folium.Map(
+            location=[preview_lat, preview_lng],
+            zoom_start=preview_zoom,
+            tiles=tile_info["tiles"],
+            attr=tile_info["attr"],
+        )
+    else:
+        preview_map = folium.Map(
+            location=[preview_lat, preview_lng],
+            zoom_start=preview_zoom,
+            tiles=tile_info["tiles"],
+        )
 
     # 近隣説明範囲（赤い円）
     Circle(
@@ -306,8 +317,9 @@ if st.button("📄 書類を生成する", type="primary", use_container_width=T
             tmpdir = tempfile.mkdtemp()
             progress = st.progress(0, text="近隣説明範囲図を生成中...")
 
-            # 1. 地図（ユーザーが調整したズームレベルを反映）
+            # 1. 地図（ユーザーが調整したズームレベル・地図種類を反映）
             user_zoom = st.session_state.get("confirmed_zoom")
+            selected_tile = tile_choice if "tile_choice" in dir() else "Google Maps"
             map_png = generate_map_png(
                 site_name=data["site_name"],
                 address=data["site_address"],
@@ -316,6 +328,7 @@ if st.button("📄 書類を生成する", type="primary", use_container_width=T
                 radius_m=radius_m,
                 output_dir=tmpdir,
                 zoom_override=user_zoom,
+                tile_name=selected_tile,
             )
             map_docx = os.path.join(tmpdir, "01_近隣説明範囲図.docx")
             generate_map_document(data, map_png, map_docx)

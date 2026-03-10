@@ -39,17 +39,45 @@ def _label_offset(radius_m):
     return max(radius_m * 1.3, 15) / 111000
 
 
-def generate_map_html(site_name, address, lat, lng, radius_m=50, zoom_override=None):
+TILE_PROVIDERS = {
+    "Google Maps": {
+        "tiles": "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+        "attr": "Google Maps",
+    },
+    "Google 航空写真": {
+        "tiles": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+        "attr": "Google Maps",
+    },
+    "OpenStreetMap": {
+        "tiles": "OpenStreetMap",
+        "attr": None,
+    },
+}
+
+
+def generate_map_html(site_name, address, lat, lng, radius_m=50, zoom_override=None, tile_name="Google Maps"):
     """Foliumで近隣説明範囲図HTMLを生成し、一時ファイルパスを返す"""
     zoom = zoom_override if zoom_override else _calc_zoom(radius_m)
 
-    m = folium.Map(
-        location=[lat, lng],
-        zoom_start=zoom,
-        tiles="OpenStreetMap",
-        width="100%",
-        height="100%",
-    )
+    tile_info = TILE_PROVIDERS.get(tile_name, TILE_PROVIDERS["Google Maps"])
+
+    if tile_info["attr"]:
+        m = folium.Map(
+            location=[lat, lng],
+            zoom_start=zoom,
+            tiles=tile_info["tiles"],
+            attr=tile_info["attr"],
+            width="100%",
+            height="100%",
+        )
+    else:
+        m = folium.Map(
+            location=[lat, lng],
+            zoom_start=zoom,
+            tiles=tile_info["tiles"],
+            width="100%",
+            height="100%",
+        )
 
     # タイトル（地図上部）
     title_html = f"""
@@ -165,9 +193,9 @@ def html_to_png(html_path, png_path, width=1200, height=900):
     return png_path
 
 
-def generate_map_png(site_name, address, lat, lng, radius_m=50, output_dir=None, zoom_override=None):
+def generate_map_png(site_name, address, lat, lng, radius_m=50, output_dir=None, zoom_override=None, tile_name="Google Maps"):
     """地図HTMLを生成→PNGに変換して返す"""
-    html_path = generate_map_html(site_name, address, lat, lng, radius_m, zoom_override=zoom_override)
+    html_path = generate_map_html(site_name, address, lat, lng, radius_m, zoom_override=zoom_override, tile_name=tile_name)
     if output_dir is None:
         output_dir = tempfile.gettempdir()
     png_path = os.path.join(output_dir, "近隣説明範囲図.png")
