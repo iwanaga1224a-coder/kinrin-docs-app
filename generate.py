@@ -18,6 +18,7 @@ from datetime import datetime
 
 # 同じディレクトリのモジュールをインポート
 sys.path.insert(0, os.path.dirname(__file__))
+from geocoder import geocode, extract_ward
 from map_generator import generate_map_png
 from doc_generator import (
     generate_sign_notice,
@@ -106,8 +107,23 @@ def collect_data_interactive():
     print("【工事基本情報】")
     data["site_name"] = ask_or_default("工事名称", DEMO_DATA["site_name"])
     data["site_address"] = ask_or_default("工事場所（住所）", DEMO_DATA["site_address"])
-    data["lat"] = float(ask_or_default("緯度", str(DEMO_DATA["lat"])))
-    data["lng"] = float(ask_or_default("経度", str(DEMO_DATA["lng"])))
+
+    # 住所から自動取得
+    print("  住所から緯度経度を取得中...")
+    coords = geocode(data["site_address"])
+    if coords:
+        data["lat"], data["lng"] = coords
+        print(f"  -> 緯度: {data['lat']:.4f}, 経度: {data['lng']:.4f}")
+    else:
+        print("  -> 取得できませんでした。デモ値を使用します。")
+        data["lat"] = DEMO_DATA["lat"]
+        data["lng"] = DEMO_DATA["lng"]
+
+    ward = extract_ward(data["site_address"])
+    if ward:
+        data["ward_name"] = ward
+        print(f"  -> 届出先: {ward}区")
+
     data["radius_m"] = int(ask_or_default("説明範囲（半径m）", str(DEMO_DATA["radius_m"])))
     data["work_content"] = ask_or_default("工事内容", DEMO_DATA["work_content"])
     print()
@@ -243,8 +259,19 @@ def generate_all(data, output_dir=None):
 
 
 def generate_from_dict(data_dict, output_dir=None):
-    """辞書データから直接生成（Claude連携用）"""
+    """辞書データから直接生成（Claude連携用）
+    lat/lng が未指定なら住所から自動取得する
+    """
     merged = {**DEMO_DATA, **data_dict}
+    # 住所から自動取得
+    if "site_address" in data_dict and ("lat" not in data_dict or "lng" not in data_dict):
+        coords = geocode(merged["site_address"])
+        if coords:
+            merged["lat"], merged["lng"] = coords
+    if "site_address" in data_dict and "ward_name" not in data_dict:
+        ward = extract_ward(merged["site_address"])
+        if ward:
+            merged["ward_name"] = ward
     return generate_all(merged, output_dir)
 
 

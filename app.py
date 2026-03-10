@@ -1,5 +1,11 @@
 # -*- coding: utf-8 -*-
-"""近隣説明会 書類生成アプリ（Streamlit）"""
+"""近隣説明会 書類生成アプリ（Streamlit）
+
+フロー:
+  ① 住所を入力 → 区を自動判定・緯度経度を自動取得
+  ② 届出ルールを確認（区ごとに異なる範囲・届出先）
+  ③ 書類を一括生成（Word 4点セット + 地図）
+"""
 
 import os
 import io
@@ -8,8 +14,8 @@ import zipfile
 import tempfile
 import streamlit as st
 
-# 同じディレクトリのモジュール
 sys.path.insert(0, os.path.dirname(__file__))
+from geocoder import geocode, extract_ward, extract_ward_with_suffix
 from map_generator import generate_map_png
 from doc_generator import (
     generate_sign_notice,
@@ -26,84 +32,142 @@ st.set_page_config(
 )
 
 st.title("🏗️ 近隣説明会 書類生成アプリ")
-st.caption("工事情報を入力するだけで、届出書類4点セットをWord形式で一括生成します")
+st.caption("住所と工事情報を入力するだけで、届出書類4点セットをWord形式で一括生成します")
 
 # ========== サイドバー ==========
-st.sidebar.header("📋 生成する書類")
+st.sidebar.header("📋 このアプリの流れ")
 st.sidebar.markdown("""
-1. **近隣説明範囲図**（地図付き）
-2. **標識設置届**
-3. **近隣説明報告書**
-4. **工事のお知らせ**
+**① 住所を入力**
+→ 区を自動判定、緯度経度を自動取得
+
+**② 届出ルールを確認**
+→ 区ごとに説明範囲・届出先が異なります
+→ 各区の窓口で最新ルールをご確認ください
+
+**③ 書類を生成**
+→ Word 4点セット + 地図PNG をZIPでダウンロード
 """)
 st.sidebar.divider()
-st.sidebar.info("入力後「書類を生成する」ボタンを押してください。\nZIPファイルでまとめてダウンロードできます。")
+st.sidebar.markdown("""
+**生成する書類:**
+1. 近隣説明範囲図（地図付き）
+2. 標識設置届
+3. 近隣説明報告書
+4. 工事のお知らせ
+""")
+st.sidebar.divider()
+st.sidebar.warning("生成した書類は叩き台です。届出前に必ず管轄窓口でご確認ください。")
 
-# ========== 入力フォーム ==========
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "① 工事基本情報",
-    "② 建物情報",
-    "③ 工期・関係者",
-    "④ 説明実施情報",
-    "⑤ オプション",
+# ========== STEP 1：住所入力 ==========
+st.header("① 工事場所と基本情報")
+
+col_addr1, col_addr2 = st.columns([3, 1])
+with col_addr1:
+    site_address = st.text_input("工事場所（住所） *", placeholder="東京都新宿区西新宿2-8-1")
+with col_addr2:
+    site_name = st.text_input("工事名称 *", placeholder="○○ビル解体工事")
+
+# 住所から自動判定
+detected_ward = ""
+detected_coords = None
+if site_address:
+    detected_ward = extract_ward(site_address)
+    detected_ward_full = extract_ward_with_suffix(site_address)
+    detected_coords = geocode(site_address)
+
+    col_info1, col_info2 = st.columns(2)
+    with col_info1:
+        if detected_ward:
+            st.success(f"届出先: **{detected_ward_full}** （自動判定）")
+        else:
+            st.warning("区名を判定できませんでした。手動で入力してください。")
+    with col_info2:
+        if detected_coords:
+            st.success(f"位置: 緯度 {detected_coords[0]:.4f} / 経度 {detected_coords[1]:.4f} （自動取得）")
+        else:
+            st.warning("緯度経度を取得できませんでした。住所を確認してください。")
+
+# ========== STEP 2：届出ルール ==========
+st.header("② 届出ルールの確認")
+
+st.info(
+    "近隣説明の範囲・届出先の部署は**区ごとに異なります**。\n\n"
+    "- 半径○mの円で指定する区\n"
+    "- 建物高さを敷地境界から倒した範囲で指定する区\n"
+    "- 高さ10m超で中高層条例が適用される区\n\n"
+    "各区の建築課・環境対策課等の窓口で最新のルール・ひな形をご確認ください。\n"
+    "ここでは範囲を手動で設定できます。"
+)
+
+col_rule1, col_rule2, col_rule3 = st.columns(3)
+with col_rule1:
+    range_type = st.selectbox("説明範囲の種類", [
+        "半径○mの円",
+        "建物高さ分を敷地境界から延長した範囲",
+    ])
+with col_rule2:
+    if range_type == "半径○mの円":
+        radius_m = st.slider("説明範囲（半径m）", min_value=10, max_value=200, value=50, step=10)
+    else:
+        radius_m = 50
+        st.caption("建物高さ分の範囲は地図上では概算の円で表示します。\n実際の範囲は敷地図に基づいて作成してください。")
+with col_rule3:
+    ward_name_input = st.text_input("届出先の区名（自動判定を修正する場合）", value=detected_ward)
+
+# ========== STEP 3：工事情報入力 ==========
+st.header("③ 工事情報の入力")
+
+tab1, tab2, tab3, tab4 = st.tabs([
+    "建物・工事内容",
+    "工期・関係者",
+    "説明実施情報",
+    "オプション",
 ])
 
 with tab1:
     col1, col2 = st.columns(2)
     with col1:
-        site_name = st.text_input("工事名称 *", placeholder="○○ビル解体工事")
-        site_address = st.text_input("工事場所（住所） *", placeholder="東京都新宿区西新宿2-8-1")
-        ward_name = st.text_input("届出先の区名", placeholder="新宿")
-    with col2:
         work_content = st.text_input("工事内容", placeholder="鉄筋コンクリート造建物の解体工事")
-        lat = st.number_input("緯度", value=35.6896, format="%.4f", help="住所から検索: https://www.geocoding.jp/")
-        lng = st.number_input("経度", value=139.6917, format="%.4f")
-
-with tab2:
-    col1, col2 = st.columns(2)
-    with col1:
         building_name = st.text_input("建物名称", placeholder="○○ビル")
         building_use = st.text_input("用途", placeholder="事務所")
-        structure = st.selectbox("構造", ["鉄筋コンクリート造", "鉄骨造", "鉄骨鉄筋コンクリート造", "木造", "その他"])
     with col2:
+        structure = st.selectbox("構造", ["鉄筋コンクリート造", "鉄骨造", "鉄骨鉄筋コンクリート造", "木造", "その他"])
         floors_above = st.text_input("地上階数", placeholder="6")
         floors_below = st.text_input("地下階数", placeholder="1")
-        height = st.text_input("高さ（m）", placeholder="22.5")
 
-    col3, col4, col5 = st.columns(3)
+    col3, col4, col5, col6 = st.columns(4)
     with col3:
-        site_area = st.text_input("敷地面積（㎡）", placeholder="500.00")
+        height = st.text_input("高さ（m）", placeholder="22.5")
     with col4:
-        building_area = st.text_input("建築面積（㎡）", placeholder="350.00")
+        site_area = st.text_input("敷地面積（㎡）", placeholder="500.00")
     with col5:
+        building_area = st.text_input("建築面積（㎡）", placeholder="350.00")
+    with col6:
         total_floor_area = st.text_input("延べ面積（㎡）", placeholder="2,100.00")
 
-with tab3:
+with tab2:
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("工期")
         start_date = st.text_input("着工予定日", placeholder="令和8年5月1日")
         end_date = st.text_input("完了予定日", placeholder="令和8年10月31日")
 
-    with col2:
         st.subheader("届出者（発注者・建築主）")
         applicant_name = st.text_input("届出者 氏名", placeholder="株式会社 ○○建設　代表取締役　○○ ○○")
         applicant_address = st.text_input("届出者 住所", placeholder="東京都千代田区○○1-1-1")
         applicant_tel = st.text_input("届出者 電話", placeholder="03-0000-0001")
 
-    col3, col4 = st.columns(2)
-    with col3:
+    with col2:
         st.subheader("設計者")
         designer_name = st.text_input("設計者名", placeholder="○○設計事務所")
         designer_tel = st.text_input("設計者 電話", placeholder="03-0000-0002")
 
-    with col4:
         st.subheader("施工者")
         constructor_name = st.text_input("施工者名", placeholder="○○建設 株式会社")
         constructor_tel = st.text_input("施工者 電話", placeholder="03-1234-5678")
         site_manager = st.text_input("現場責任者", placeholder="○○ ○○")
 
-with tab4:
+with tab3:
     col1, col2 = st.columns(2)
     with col1:
         explanation_date = st.text_input("説明実施日", placeholder="令和8年3月15日")
@@ -117,13 +181,11 @@ with tab4:
         target_count = st.text_input("説明対象戸数", placeholder="25")
         explained_count = st.text_input("説明済み戸数", placeholder="20")
         unexplained_count = st.text_input("未説明戸数（不在等）", placeholder="5")
-
     opinions = st.text_area("住民からの意見・要望", placeholder="特になし", height=100)
 
-with tab5:
+with tab4:
     col1, col2 = st.columns(2)
     with col1:
-        radius_m = st.slider("説明範囲（半径m）", min_value=10, max_value=200, value=50, step=10)
         work_hours = st.text_input("作業時間", value="午前8時00分 ～ 午後5時00分")
         holidays = st.text_input("休工日", value="日曜日・祝日")
     with col2:
@@ -135,12 +197,17 @@ with tab5:
 st.divider()
 
 if st.button("📄 書類を生成する", type="primary", use_container_width=True):
-    # バリデーション
     if not site_name or not site_address:
         st.error("「工事名称」と「工事場所」は必須です。")
         st.stop()
 
-    # データ辞書を組み立て
+    if not detected_coords:
+        st.error("住所から位置情報を取得できませんでした。住所を確認してください。")
+        st.stop()
+
+    lat, lng = detected_coords
+    ward = ward_name_input or detected_ward
+
     data = {
         "site_name": site_name,
         "site_address": site_address,
@@ -161,7 +228,7 @@ if st.button("📄 書類を生成する", type="primary", use_container_width=T
         "end_date": end_date or "",
         "work_hours": work_hours,
         "holidays": holidays,
-        "ward_name": ward_name or "",
+        "ward_name": ward,
         "submit_date": submit_date or "",
         "sign_install_date": sign_install_date or "",
         "sign_location": "建築予定地の道路に面する見やすい場所",
@@ -185,16 +252,15 @@ if st.button("📄 書類を生成する", type="primary", use_container_width=T
     with st.spinner("書類を生成中..."):
         try:
             tmpdir = tempfile.mkdtemp()
-
             progress = st.progress(0, text="近隣説明範囲図を生成中...")
 
             # 1. 地図
             map_png = generate_map_png(
                 site_name=data["site_name"],
                 address=data["site_address"],
-                lat=data["lat"],
-                lng=data["lng"],
-                radius_m=data["radius_m"],
+                lat=lat,
+                lng=lng,
+                radius_m=radius_m,
                 output_dir=tmpdir,
             )
             map_docx = os.path.join(tmpdir, "01_近隣説明範囲図.docx")
@@ -233,7 +299,6 @@ if st.button("📄 書類を生成する", type="primary", use_container_width=T
 
             st.success("書類の生成が完了しました！")
 
-            # ダウンロードボタン
             safe_name = site_name.replace("/", "_").replace("\\", "_")
             st.download_button(
                 label="📥 書類一式をダウンロード（ZIP）",
@@ -244,7 +309,6 @@ if st.button("📄 書類を生成する", type="primary", use_container_width=T
                 use_container_width=True,
             )
 
-            # プレビュー
             with st.expander("📋 生成した書類の一覧", expanded=True):
                 col1, col2, col3, col4 = st.columns(4)
                 col1.metric("近隣説明範囲図", "01_.docx")
@@ -252,7 +316,6 @@ if st.button("📄 書類を生成する", type="primary", use_container_width=T
                 col3.metric("近隣説明報告書", "03_.docx")
                 col4.metric("工事のお知らせ", "04_.docx")
 
-            # 地図プレビュー
             if os.path.exists(map_png):
                 with st.expander("🗺️ 近隣説明範囲図プレビュー", expanded=True):
                     st.image(map_png, caption=f"近隣説明範囲図 - {site_name}（半径{radius_m}m）")
