@@ -75,17 +75,12 @@ if site_address:
     detected_ward_full = extract_ward_with_suffix(site_address)
     detected_coords = geocode(site_address)
 
-    col_info1, col_info2 = st.columns(2)
-    with col_info1:
-        if detected_ward:
-            st.success(f"届出先: **{detected_ward_full}** （自動判定）")
-        else:
-            st.warning("区名を判定できませんでした。手動で入力してください。")
-    with col_info2:
-        if detected_coords:
-            st.success(f"位置: 緯度 {detected_coords[0]:.4f} / 経度 {detected_coords[1]:.4f} （自動取得）")
-        else:
-            st.warning("緯度経度を取得できませんでした。住所を確認してください。")
+    if detected_ward:
+        st.success(f"届出先: **{detected_ward_full}** （自動判定）")
+    else:
+        st.warning("区名を判定できませんでした。手動で入力してください。")
+    if not detected_coords:
+        st.warning("住所から位置を取得できませんでした。住所を確認してください。")
 
 # ========== STEP 2：届出ルール ==========
 st.header("② 届出ルールの確認")
