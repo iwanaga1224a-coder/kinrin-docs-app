@@ -1,0 +1,4 @@
+streamlit>=1.30.0
+folium>=0.15.0
+selenium>=4.15.0
+python-docx>=1.0.0
