@@ -48,6 +48,14 @@ TILE_PROVIDERS = {
         "tiles": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
         "attr": "Google Maps",
     },
+    "国土地理院（標準）": {
+        "tiles": "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png",
+        "attr": "国土地理院",
+    },
+    "国土地理院（航空写真）": {
+        "tiles": "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg",
+        "attr": "国土地理院",
+    },
     "OpenStreetMap": {
         "tiles": "OpenStreetMap",
         "attr": None,
