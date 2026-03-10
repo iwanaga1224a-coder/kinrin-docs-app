@@ -171,33 +171,50 @@ def generate_map_html(site_name, address, lat, lng, radius_m=50, zoom_override=N
     return tmp.name
 
 
-def html_to_png(html_path, png_path, width=1200, height=900):
-    """ヘッドレスChromeでHTMLをスクリーンショット→PNGに保存"""
+def html_to_png(html_path, png_path, width=1200, height=900, scale=1.0):
+    """ヘッドレスChromeでHTMLをスクリーンショット→PNGに保存
+    scale > 1.0 で中央部分を切り出して拡大表示（タイル上限を超えて寄れる）
+    """
+    # scaleが大きいほど広い領域をレンダリングして中央を切り出す
+    render_w = int(width * scale)
+    render_h = int(height * scale)
+
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
-    options.add_argument(f"--window-size={width},{height}")
+    options.add_argument(f"--window-size={render_w},{render_h}")
     options.add_argument("--hide-scrollbars")
 
     driver = webdriver.Chrome(options=options)
     try:
         driver.get(f"file:///{html_path.replace(os.sep, '/')}")
-        # タイルの読み込みを待つ
         time.sleep(3)
+
+        if scale > 1.0:
+            # CSS transformで拡大して中央を表示
+            driver.execute_script(f"""
+                var mapEl = document.querySelector('.folium-map');
+                if (mapEl) {{
+                    mapEl.style.transform = 'scale({scale})';
+                    mapEl.style.transformOrigin = 'center center';
+                }}
+            """)
+            time.sleep(1)
+
         driver.save_screenshot(png_path)
     finally:
         driver.quit()
     return png_path
 
 
-def generate_map_png(site_name, address, lat, lng, radius_m=50, output_dir=None, zoom_override=None, tile_name="国土地理院（標準）"):
+def generate_map_png(site_name, address, lat, lng, radius_m=50, output_dir=None, zoom_override=None, tile_name="国土地理院（標準）", scale=1.0):
     """地図HTMLを生成→PNGに変換して返す"""
     html_path = generate_map_html(site_name, address, lat, lng, radius_m, zoom_override=zoom_override, tile_name=tile_name)
     if output_dir is None:
         output_dir = tempfile.gettempdir()
     png_path = os.path.join(output_dir, "近隣説明範囲図.png")
-    html_to_png(html_path, png_path)
+    html_to_png(html_path, png_path, scale=scale)
     # 一時HTMLを削除
     os.unlink(html_path)
     return png_path
