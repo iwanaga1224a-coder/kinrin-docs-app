@@ -18,17 +18,17 @@ def _calc_zoom(radius_m, zoom_offset=0):
     zoom_offset: 正で拡大、負で縮小（ユーザー調整用）
     """
     if radius_m <= 0:
-        return min(20, 19 + zoom_offset)
+        return min(21, 19 + zoom_offset)
     # 円の直径がちょうど画面に収まる程度
     target_screen_m = radius_m * 2.5
     # 1ピクセルあたりのメートル: 156543.03 * cos(lat) / 2^zoom
     # 東京(lat≒35.7): cos(35.7°) ≒ 0.812, 画面幅1200px
-    for z in range(20, 10, -1):
+    for z in range(21, 10, -1):
         meters_per_px = 156543.03 * 0.812 / (2 ** z)
         screen_m = meters_per_px * 1200
         if screen_m >= target_screen_m:
-            return max(1, min(20, z + zoom_offset))
-    return max(1, min(20, 14 + zoom_offset))
+            return max(1, min(21, z + zoom_offset))
+    return max(1, min(21, 14 + zoom_offset))
 
 
 def _label_offset(radius_m):
@@ -41,14 +41,20 @@ TILE_PROVIDERS = {
     "国土地理院（標準）": {
         "tiles": "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png",
         "attr": "国土地理院",
+        "max_native_zoom": 18,
+        "max_zoom": 21,
     },
     "国土地理院（航空写真）": {
         "tiles": "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg",
         "attr": "国土地理院",
+        "max_native_zoom": 18,
+        "max_zoom": 21,
     },
     "OpenStreetMap": {
         "tiles": "OpenStreetMap",
         "attr": None,
+        "max_native_zoom": 19,
+        "max_zoom": 21,
     },
 }
 
@@ -58,24 +64,31 @@ def generate_map_html(site_name, address, lat, lng, radius_m=50, zoom_override=N
     zoom = zoom_override if zoom_override else _calc_zoom(radius_m)
 
     tile_info = TILE_PROVIDERS.get(tile_name, TILE_PROVIDERS["国土地理院（標準）"])
+    max_zoom = tile_info.get("max_zoom", 21)
+
+    # ベースマップ（タイルなし）を作り、TileLayerでmaxNativeZoomを指定
+    m = folium.Map(
+        location=[lat, lng],
+        zoom_start=zoom,
+        tiles=None,
+        max_zoom=max_zoom,
+        width="100%",
+        height="100%",
+    )
 
     if tile_info["attr"]:
-        m = folium.Map(
-            location=[lat, lng],
-            zoom_start=zoom,
+        folium.TileLayer(
             tiles=tile_info["tiles"],
             attr=tile_info["attr"],
-            width="100%",
-            height="100%",
-        )
+            max_native_zoom=tile_info.get("max_native_zoom", 18),
+            max_zoom=max_zoom,
+        ).add_to(m)
     else:
-        m = folium.Map(
-            location=[lat, lng],
-            zoom_start=zoom,
+        folium.TileLayer(
             tiles=tile_info["tiles"],
-            width="100%",
-            height="100%",
-        )
+            max_native_zoom=tile_info.get("max_native_zoom", 19),
+            max_zoom=max_zoom,
+        ).add_to(m)
 
     # タイトル（地図上部）
     title_html = f"""
@@ -171,50 +184,32 @@ def generate_map_html(site_name, address, lat, lng, radius_m=50, zoom_override=N
     return tmp.name
 
 
-def html_to_png(html_path, png_path, width=1200, height=900, scale=1.0):
-    """ヘッドレスChromeでHTMLをスクリーンショット→PNGに保存
-    scale > 1.0 で中央部分を切り出して拡大表示（タイル上限を超えて寄れる）
-    """
-    # scaleが大きいほど広い領域をレンダリングして中央を切り出す
-    render_w = int(width * scale)
-    render_h = int(height * scale)
-
+def html_to_png(html_path, png_path, width=1200, height=900):
+    """ヘッドレスChromeでHTMLをスクリーンショット→PNGに保存"""
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
-    options.add_argument(f"--window-size={render_w},{render_h}")
+    options.add_argument(f"--window-size={width},{height}")
     options.add_argument("--hide-scrollbars")
 
     driver = webdriver.Chrome(options=options)
     try:
         driver.get(f"file:///{html_path.replace(os.sep, '/')}")
         time.sleep(3)
-
-        if scale > 1.0:
-            # CSS transformで拡大して中央を表示
-            driver.execute_script(f"""
-                var mapEl = document.querySelector('.folium-map');
-                if (mapEl) {{
-                    mapEl.style.transform = 'scale({scale})';
-                    mapEl.style.transformOrigin = 'center center';
-                }}
-            """)
-            time.sleep(1)
-
         driver.save_screenshot(png_path)
     finally:
         driver.quit()
     return png_path
 
 
-def generate_map_png(site_name, address, lat, lng, radius_m=50, output_dir=None, zoom_override=None, tile_name="国土地理院（標準）", scale=1.0):
+def generate_map_png(site_name, address, lat, lng, radius_m=50, output_dir=None, zoom_override=None, tile_name="国土地理院（標準）"):
     """地図HTMLを生成→PNGに変換して返す"""
     html_path = generate_map_html(site_name, address, lat, lng, radius_m, zoom_override=zoom_override, tile_name=tile_name)
     if output_dir is None:
         output_dir = tempfile.gettempdir()
     png_path = os.path.join(output_dir, "近隣説明範囲図.png")
-    html_to_png(html_path, png_path, scale=scale)
+    html_to_png(html_path, png_path)
     # 一時HTMLを削除
     os.unlink(html_path)
     return png_path
