@@ -13,24 +13,22 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
 
-def _calc_zoom(radius_m):
+def _calc_zoom(radius_m, zoom_offset=0):
     """半径(m)に応じた最適なズームレベルを計算
-    円が画面の40〜60%くらいを占めるサイズにする
+    zoom_offset: 正で拡大、負で縮小（ユーザー調整用）
     """
     if radius_m <= 0:
-        return 19
-    # 画面の半分に円が収まるように計算
-    # zoom 18 ≒ 約100m幅、zoom毎に2倍
-    target_screen_m = radius_m * 3.5  # 円の直径+余白
-    # OpenStreetMapの1ピクセルあたりのメートル: 156543.03 * cos(lat) / 2^zoom
-    # 東京(lat≒35.7): cos(35.7°) ≒ 0.812
-    # 画面幅1200px想定
+        return min(20, 19 + zoom_offset)
+    # 円の直径がちょうど画面に収まる程度
+    target_screen_m = radius_m * 2.5
+    # 1ピクセルあたりのメートル: 156543.03 * cos(lat) / 2^zoom
+    # 東京(lat≒35.7): cos(35.7°) ≒ 0.812, 画面幅1200px
     for z in range(20, 10, -1):
         meters_per_px = 156543.03 * 0.812 / (2 ** z)
         screen_m = meters_per_px * 1200
         if screen_m >= target_screen_m:
-            return z
-    return 14
+            return max(1, min(20, z + zoom_offset))
+    return max(1, min(20, 14 + zoom_offset))
 
 
 def _label_offset(radius_m):

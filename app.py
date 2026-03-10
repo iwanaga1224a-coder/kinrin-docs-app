@@ -126,10 +126,15 @@ if detected_coords:
     st.subheader("地図プレビュー")
     st.caption("拡大・縮小・移動で調整してください。この表示範囲が書類の地図に反映されます。")
 
-    tile_choice = st.radio("地図の種類", list(TILE_PROVIDERS.keys()), horizontal=True, index=0)
+    col_map_opt1, col_map_opt2 = st.columns([2, 1])
+    with col_map_opt1:
+        tile_choice = st.radio("地図の種類", list(TILE_PROVIDERS.keys()), horizontal=True, index=0)
+    with col_map_opt2:
+        zoom_adjust = st.slider("拡大・縮小", min_value=-3, max_value=5, value=0, step=1,
+                                help="＋で拡大、−で縮小。0が自動フィット")
 
     preview_lat, preview_lng = detected_coords
-    preview_zoom = _calc_zoom(radius_m)
+    preview_zoom = _calc_zoom(radius_m, zoom_offset=zoom_adjust)
 
     tile_info = TILE_PROVIDERS[tile_choice]
     if tile_info["attr"]:
@@ -317,9 +322,10 @@ if st.button("📄 書類を生成する", type="primary", use_container_width=T
             tmpdir = tempfile.mkdtemp()
             progress = st.progress(0, text="近隣説明範囲図を生成中...")
 
-            # 1. 地図（ユーザーが調整したズームレベル・地図種類を反映）
-            user_zoom = st.session_state.get("confirmed_zoom")
+            # 1. 地図（プレビューと同じズーム・地図種類を反映）
             selected_tile = tile_choice if "tile_choice" in dir() else "国土地理院（標準）"
+            user_zoom_offset = zoom_adjust if "zoom_adjust" in dir() else 0
+            final_zoom = _calc_zoom(radius_m, zoom_offset=user_zoom_offset)
             map_png = generate_map_png(
                 site_name=data["site_name"],
                 address=data["site_address"],
@@ -327,7 +333,7 @@ if st.button("📄 書類を生成する", type="primary", use_container_width=T
                 lng=lng,
                 radius_m=radius_m,
                 output_dir=tmpdir,
-                zoom_override=user_zoom,
+                zoom_override=final_zoom,
                 tile_name=selected_tile,
             )
             map_docx = os.path.join(tmpdir, "01_近隣説明範囲図.docx")
