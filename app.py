@@ -319,7 +319,7 @@ if st.button("📄 書類を生成する", type="primary", use_container_width=T
 
             # 1. 地図（ユーザーが調整したズームレベル・地図種類を反映）
             user_zoom = st.session_state.get("confirmed_zoom")
-            selected_tile = tile_choice if "tile_choice" in dir() else "Google Maps"
+            selected_tile = tile_choice if "tile_choice" in dir() else "国土地理院（標準）"
             map_png = generate_map_png(
                 site_name=data["site_name"],
                 address=data["site_address"],

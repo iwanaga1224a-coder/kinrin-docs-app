@@ -40,14 +40,6 @@ def _label_offset(radius_m):
 
 
 TILE_PROVIDERS = {
-    "Google Maps": {
-        "tiles": "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
-        "attr": "Google Maps",
-    },
-    "Google 航空写真": {
-        "tiles": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
-        "attr": "Google Maps",
-    },
     "国土地理院（標準）": {
         "tiles": "https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png",
         "attr": "国土地理院",
@@ -63,11 +55,11 @@ TILE_PROVIDERS = {
 }
 
 
-def generate_map_html(site_name, address, lat, lng, radius_m=50, zoom_override=None, tile_name="Google Maps"):
+def generate_map_html(site_name, address, lat, lng, radius_m=50, zoom_override=None, tile_name="国土地理院（標準）"):
     """Foliumで近隣説明範囲図HTMLを生成し、一時ファイルパスを返す"""
     zoom = zoom_override if zoom_override else _calc_zoom(radius_m)
 
-    tile_info = TILE_PROVIDERS.get(tile_name, TILE_PROVIDERS["Google Maps"])
+    tile_info = TILE_PROVIDERS.get(tile_name, TILE_PROVIDERS["国土地理院（標準）"])
 
     if tile_info["attr"]:
         m = folium.Map(
@@ -201,7 +193,7 @@ def html_to_png(html_path, png_path, width=1200, height=900):
     return png_path
 
 
-def generate_map_png(site_name, address, lat, lng, radius_m=50, output_dir=None, zoom_override=None, tile_name="Google Maps"):
+def generate_map_png(site_name, address, lat, lng, radius_m=50, output_dir=None, zoom_override=None, tile_name="国土地理院（標準）"):
     """地図HTMLを生成→PNGに変換して返す"""
     html_path = generate_map_html(site_name, address, lat, lng, radius_m, zoom_override=zoom_override, tile_name=tile_name)
     if output_dir is None:
