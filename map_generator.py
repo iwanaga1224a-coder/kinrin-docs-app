@@ -39,9 +39,9 @@ def _label_offset(radius_m):
     return max(radius_m * 1.3, 15) / 111000
 
 
-def generate_map_html(site_name, address, lat, lng, radius_m=50):
+def generate_map_html(site_name, address, lat, lng, radius_m=50, zoom_override=None):
     """Foliumで近隣説明範囲図HTMLを生成し、一時ファイルパスを返す"""
-    zoom = _calc_zoom(radius_m)
+    zoom = zoom_override if zoom_override else _calc_zoom(radius_m)
 
     m = folium.Map(
         location=[lat, lng],
@@ -165,9 +165,9 @@ def html_to_png(html_path, png_path, width=1200, height=900):
     return png_path
 
 
-def generate_map_png(site_name, address, lat, lng, radius_m=50, output_dir=None):
+def generate_map_png(site_name, address, lat, lng, radius_m=50, output_dir=None, zoom_override=None):
     """地図HTMLを生成→PNGに変換して返す"""
-    html_path = generate_map_html(site_name, address, lat, lng, radius_m)
+    html_path = generate_map_html(site_name, address, lat, lng, radius_m, zoom_override=zoom_override)
     if output_dir is None:
         output_dir = tempfile.gettempdir()
     png_path = os.path.join(output_dir, "近隣説明範囲図.png")

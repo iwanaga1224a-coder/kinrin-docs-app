@@ -13,10 +13,13 @@ import sys
 import zipfile
 import tempfile
 import streamlit as st
+import folium
+from folium import Circle, Marker, DivIcon
+from streamlit_folium import st_folium
 
 sys.path.insert(0, os.path.dirname(__file__))
 from geocoder import geocode, extract_ward, extract_ward_with_suffix
-from map_generator import generate_map_png
+from map_generator import generate_map_png, _calc_zoom
 from nearby_search import search_nearby, format_nearby_list
 from doc_generator import (
     generate_sign_notice,
@@ -117,6 +120,51 @@ with col_rule2:
         radius_m = st.slider("説明範囲（半径m）", min_value=10, max_value=200, value=50, step=10)
 with col_rule3:
     ward_name_input = st.text_input("届出先の区名（自動判定を修正する場合）", value=detected_ward)
+
+# ========== 地図プレビュー ==========
+if detected_coords:
+    st.subheader("地図プレビュー")
+    st.caption("拡大・縮小・移動で調整してください。この表示範囲が書類の地図に反映されます。")
+
+    preview_lat, preview_lng = detected_coords
+    preview_zoom = _calc_zoom(radius_m)
+
+    preview_map = folium.Map(
+        location=[preview_lat, preview_lng],
+        zoom_start=preview_zoom,
+        tiles="OpenStreetMap",
+    )
+
+    # 近隣説明範囲（赤い円）
+    Circle(
+        location=[preview_lat, preview_lng],
+        radius=radius_m,
+        color="red",
+        weight=3,
+        fill=True,
+        fill_color="red",
+        fill_opacity=0.08,
+    ).add_to(preview_map)
+
+    # 現場マーカー
+    Marker(
+        location=[preview_lat, preview_lng],
+        popup=f"{site_name or '工事現場'}<br>{site_address}",
+        icon=DivIcon(
+            html='<div style="font-size:28px;color:red;text-shadow:1px 1px 2px rgba(0,0,0,0.5);transform:translate(-14px,-14px);">&#9733;</div>',
+            icon_size=(30, 30),
+            icon_anchor=(0, 0),
+        ),
+    ).add_to(preview_map)
+
+    # インタラクティブ地図を表示、ユーザーの操作後のzoomとcenterを取得
+    map_output = st_folium(preview_map, width=800, height=500, returned_objects=[])
+
+    # ユーザーが操作した後のzoom/centerをsession_stateに保存
+    if map_output and map_output.get("zoom"):
+        st.session_state["confirmed_zoom"] = map_output["zoom"]
+    if map_output and map_output.get("center"):
+        st.session_state["confirmed_center"] = map_output["center"]
 
 # ========== STEP 3：工事情報入力 ==========
 st.header("③ 工事情報の入力")
@@ -258,7 +306,8 @@ if st.button("📄 書類を生成する", type="primary", use_container_width=T
             tmpdir = tempfile.mkdtemp()
             progress = st.progress(0, text="近隣説明範囲図を生成中...")
 
-            # 1. 地図
+            # 1. 地図（ユーザーが調整したズームレベルを反映）
+            user_zoom = st.session_state.get("confirmed_zoom")
             map_png = generate_map_png(
                 site_name=data["site_name"],
                 address=data["site_address"],
@@ -266,6 +315,7 @@ if st.button("📄 書類を生成する", type="primary", use_container_width=T
                 lng=lng,
                 radius_m=radius_m,
                 output_dir=tmpdir,
+                zoom_override=user_zoom,
             )
             map_docx = os.path.join(tmpdir, "01_近隣説明範囲図.docx")
             generate_map_document(data, map_png, map_docx)
