@@ -126,15 +126,27 @@ if detected_coords:
     st.subheader("地図プレビュー")
     st.caption("拡大・縮小・移動で調整してください。この表示範囲が書類の地図に反映されます。")
 
-    col_map_opt1, col_map_opt2 = st.columns([2, 1])
+    col_map_opt1, col_map_opt2, col_map_opt3 = st.columns([2, 1, 1])
     with col_map_opt1:
         tile_choice = st.radio("地図の種類", list(TILE_PROVIDERS.keys()), horizontal=True, index=0)
     with col_map_opt2:
         zoom_adjust = st.slider("拡大・縮小", min_value=-3, max_value=5, value=0, step=1,
                                 help="＋で拡大、−で縮小。0が自動。国土地理院はzoom18以上も拡大可")
+    with col_map_opt3:
+        edit_mode = st.toggle("★の位置を修正", value=False,
+                              help="ONにして地図をクリックすると、★と円の位置を移動できます")
 
-    preview_lat, preview_lng = detected_coords
+    # マーカー位置の管理（クリックで移動可能）
+    if "marker_lat" not in st.session_state or not edit_mode:
+        st.session_state["marker_lat"] = detected_coords[0]
+        st.session_state["marker_lng"] = detected_coords[1]
+
+    preview_lat = st.session_state["marker_lat"]
+    preview_lng = st.session_state["marker_lng"]
     preview_zoom = _calc_zoom(radius_m, zoom_offset=zoom_adjust)
+
+    if edit_mode:
+        st.info("地図をクリックすると★と円がその位置に移動します。")
 
     tile_info = TILE_PROVIDERS[tile_choice]
     max_zoom = tile_info.get("max_zoom", 21)
@@ -180,14 +192,18 @@ if detected_coords:
         ),
     ).add_to(preview_map)
 
-    # インタラクティブ地図を表示、ユーザーの操作後のzoomとcenterを取得
+    # インタラクティブ地図を表示
     map_output = st_folium(preview_map, width=800, height=500, returned_objects=[])
 
-    # ユーザーが操作した後のzoom/centerをsession_stateに保存
-    if map_output and map_output.get("zoom"):
-        st.session_state["confirmed_zoom"] = map_output["zoom"]
-    if map_output and map_output.get("center"):
-        st.session_state["confirmed_center"] = map_output["center"]
+    # 編集モード時：クリック位置にマーカーを移動
+    if edit_mode and map_output and map_output.get("last_clicked"):
+        clicked = map_output["last_clicked"]
+        new_lat = clicked["lat"]
+        new_lng = clicked["lng"]
+        if new_lat != st.session_state["marker_lat"] or new_lng != st.session_state["marker_lng"]:
+            st.session_state["marker_lat"] = new_lat
+            st.session_state["marker_lng"] = new_lng
+            st.rerun()
 
 # ========== STEP 3：工事情報入力 ==========
 st.header("③ 工事情報の入力")
@@ -280,7 +296,9 @@ if st.button("📄 書類を生成する", type="primary", use_container_width=T
         st.error("住所から位置情報を取得できませんでした。住所を確認してください。")
         st.stop()
 
-    lat, lng = detected_coords
+    # マーカー位置（ユーザーが修正した場合はそちらを使用）
+    lat = st.session_state.get("marker_lat", detected_coords[0])
+    lng = st.session_state.get("marker_lng", detected_coords[1])
     ward = ward_name_input or detected_ward
 
     data = {
