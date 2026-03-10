@@ -97,15 +97,23 @@ st.info(
 col_rule1, col_rule2, col_rule3 = st.columns(3)
 with col_rule1:
     range_type = st.selectbox("説明範囲の種類", [
+        "敷地境界から10mの範囲",
+        "建物の高さ分の範囲",
         "半径○mの円",
-        "建物高さ分を敷地境界から延長した範囲",
     ])
 with col_rule2:
-    if range_type == "半径○mの円":
-        radius_m = st.slider("説明範囲（半径m）", min_value=10, max_value=200, value=50, step=10)
+    if range_type == "敷地境界から10mの範囲":
+        radius_m = 10
+        st.caption("敷地境界から10mの範囲を円で概算表示します。\n正確な範囲は敷地図に基づいて作成してください。")
+    elif range_type == "建物の高さ分の範囲":
+        building_height_for_range = st.number_input(
+            "建物の高さ（m）", min_value=1.0, max_value=200.0, value=20.0, step=0.5,
+            help="この高さを敷地境界からの説明範囲として使用します"
+        )
+        radius_m = int(building_height_for_range)
+        st.caption(f"建物高さ {building_height_for_range}m を概算の円（半径{radius_m}m）で表示します。\n正確な範囲は敷地図に基づいて作成してください。")
     else:
-        radius_m = 50
-        st.caption("建物高さ分の範囲は地図上では概算の円で表示します。\n実際の範囲は敷地図に基づいて作成してください。")
+        radius_m = st.slider("説明範囲（半径m）", min_value=10, max_value=200, value=50, step=10)
 with col_rule3:
     ward_name_input = st.text_input("届出先の区名（自動判定を修正する場合）", value=detected_ward)
 
