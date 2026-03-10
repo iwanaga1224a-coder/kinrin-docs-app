@@ -17,6 +17,7 @@ import streamlit as st
 sys.path.insert(0, os.path.dirname(__file__))
 from geocoder import geocode, extract_ward, extract_ward_with_suffix
 from map_generator import generate_map_png
+from nearby_search import search_nearby, format_nearby_list
 from doc_generator import (
     generate_sign_notice,
     generate_explanation_report,
@@ -283,6 +284,19 @@ if st.button("📄 書類を生成する", type="primary", use_container_width=T
             # 4. お知らせ
             notice_docx = os.path.join(tmpdir, "04_工事のお知らせ.docx")
             generate_construction_notice(data, notice_docx)
+            progress.progress(80, text="近隣施設を検索中...")
+
+            # 5. 近隣施設リスト
+            nearby_data = search_nearby(lat, lng, radius_m)
+            nearby_text = format_nearby_list(nearby_data)
+            nearby_path = os.path.join(tmpdir, "05_近隣施設一覧.txt")
+            with open(nearby_path, "w", encoding="utf-8") as f:
+                f.write(f"近隣説明範囲内の施設・建物一覧\n")
+                f.write(f"工事名: {site_name}\n")
+                f.write(f"工事場所: {site_address}\n")
+                f.write(f"説明範囲: 半径{radius_m}m\n")
+                f.write(f"{'=' * 50}\n\n")
+                f.write(nearby_text)
             progress.progress(100, text="完了！")
 
             # ZIPにまとめる
@@ -293,6 +307,7 @@ if st.button("📄 書類を生成する", type="primary", use_container_width=T
                     "02_標識設置届.docx",
                     "03_近隣説明報告書.docx",
                     "04_工事のお知らせ.docx",
+                    "05_近隣施設一覧.txt",
                     "近隣説明範囲図.png",
                 ]:
                     fpath = os.path.join(tmpdir, fname)
@@ -322,6 +337,41 @@ if st.button("📄 書類を生成する", type="primary", use_container_width=T
             if os.path.exists(map_png):
                 with st.expander("🗺️ 近隣説明範囲図プレビュー", expanded=True):
                     st.image(map_png, caption=f"近隣説明範囲図 - {site_name}（半径{radius_m}m）")
+
+            # 近隣施設リスト表示
+            if nearby_data:
+                with st.expander("🏘️ 近隣施設・建物一覧（範囲内）", expanded=True):
+                    priority = [
+                        "医療施設", "教育施設", "福祉施設", "宗教施設",
+                        "集合住宅", "戸建て住宅",
+                        "店舗・商業施設", "事務所・商業ビル",
+                        "公園・レジャー",
+                    ]
+                    shown = set()
+                    for cat in priority:
+                        if cat in nearby_data:
+                            items = nearby_data[cat]
+                            named = [i for i in items if i["name"]]
+                            unnamed_count = len(items) - len(named)
+                            st.markdown(f"**{cat}**")
+                            for item in named:
+                                addr_part = f"（{item['address']}）" if item["address"] else ""
+                                st.markdown(f"- {item['name']}{addr_part}")
+                            if unnamed_count > 0:
+                                st.markdown(f"- 他 {unnamed_count}件（名称不明）")
+                            shown.add(cat)
+                    for cat in sorted(nearby_data.keys()):
+                        if cat not in shown:
+                            items = nearby_data[cat]
+                            named = [i for i in items if i["name"]]
+                            unnamed_count = len(items) - len(named)
+                            st.markdown(f"**{cat}**")
+                            for item in named:
+                                addr_part = f"（{item['address']}）" if item["address"] else ""
+                                st.markdown(f"- {item['name']}{addr_part}")
+                            if unnamed_count > 0:
+                                st.markdown(f"- 他 {unnamed_count}件（名称不明）")
+                    st.caption("※ OpenStreetMapのデータに基づく参考情報です。現地確認で正確な対象範囲を特定してください。")
 
         except Exception as e:
             st.error(f"エラーが発生しました: {e}")

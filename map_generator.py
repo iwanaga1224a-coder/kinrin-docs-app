@@ -4,6 +4,7 @@ Folium地図 → ヘッドレスChromeでPNG → Word埋め込み対応
 """
 
 import os
+import math
 import time
 import tempfile
 import folium
@@ -12,11 +13,39 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
 
+def _calc_zoom(radius_m):
+    """半径(m)に応じた最適なズームレベルを計算
+    円が画面の40〜60%くらいを占めるサイズにする
+    """
+    if radius_m <= 0:
+        return 19
+    # 画面の半分に円が収まるように計算
+    # zoom 18 ≒ 約100m幅、zoom毎に2倍
+    target_screen_m = radius_m * 3.5  # 円の直径+余白
+    # OpenStreetMapの1ピクセルあたりのメートル: 156543.03 * cos(lat) / 2^zoom
+    # 東京(lat≒35.7): cos(35.7°) ≒ 0.812
+    # 画面幅1200px想定
+    for z in range(20, 10, -1):
+        meters_per_px = 156543.03 * 0.812 / (2 ** z)
+        screen_m = meters_per_px * 1200
+        if screen_m >= target_screen_m:
+            return z
+    return 14
+
+
+def _label_offset(radius_m):
+    """半径に応じたラベルのオフセット（緯度方向）"""
+    # 1度 ≒ 111,000m
+    return max(radius_m * 1.3, 15) / 111000
+
+
 def generate_map_html(site_name, address, lat, lng, radius_m=50):
     """Foliumで近隣説明範囲図HTMLを生成し、一時ファイルパスを返す"""
+    zoom = _calc_zoom(radius_m)
+
     m = folium.Map(
         location=[lat, lng],
-        zoom_start=17,
+        zoom_start=zoom,
         tiles="OpenStreetMap",
         width="100%",
         height="100%",
@@ -90,9 +119,10 @@ def generate_map_html(site_name, address, lat, lng, radius_m=50):
         ),
     ).add_to(m)
 
-    # 現場ラベル
+    # 現場ラベル（円の外側に配置）
+    offset = _label_offset(radius_m)
     Marker(
-        location=[lat + 0.0002, lng],
+        location=[lat + offset, lng],
         icon=DivIcon(
             html=f"""
             <div style="
