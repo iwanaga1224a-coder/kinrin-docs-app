@@ -29,6 +29,7 @@ from doc_generator import (
     generate_construction_notice,
     generate_map_document,
 )
+from ward_config import get_demolition_checkboxes
 
 # ========== ページ設定 ==========
 st.set_page_config(
@@ -1004,6 +1005,13 @@ with tab1:
                 other_zone = st.text_input("その他の地域・地区", placeholder="第3種高度地区")
 
     # 解体工事専用フィールド（解体モード時のみ表示）
+    # チェックボックス用の変数を初期化
+    large_building_checks = []
+    explanation_method_checks = []
+    attachment_checks = []
+    specific_construction_status = ""
+    rodent_control_status = ""
+
     if is_demolition:
         st.markdown("**解体工事の詳細**")
         col_demo1, col_demo2 = st.columns(2)
@@ -1024,7 +1032,7 @@ with tab1:
                 "無し",
                 "有り",
                 "調査中",
-            ], help="標識・報告書に記載（要綱第6条: 事前調査が必要）")
+            ], help="標識・報告書に記載（☑/□で出力）")
             asbestos_removal_method = ""
             if asbestos_status == "有り":
                 asbestos_removal_method = st.text_input("石綿等の除去方法",
@@ -1034,6 +1042,49 @@ with tab1:
                                             help="標識に記載")
             vehicle_route = st.text_input("工事車両通行経路", placeholder="○○通り→△△交差点→□□通り",
                                           help="標識に記載")
+
+        # --- 区ごとの動的チェックボックス ---
+        _ward_for_cb = detected_ward if detected_ward else ""
+        _cb_defs = get_demolition_checkboxes(_ward_for_cb)
+        # asbestos は上のselectboxで既に処理済みなのでスキップ
+        _cb_defs_filtered = [d for d in _cb_defs if d["id"] != "asbestos"]
+
+        if _cb_defs_filtered:
+            st.markdown("**チェック項目（Wordに ☑/□ で出力）**")
+            for cb_def in _cb_defs_filtered:
+                cb_id = cb_def["id"]
+                cb_label = cb_def["label"]
+                cb_options = cb_def["options"]
+                cb_type = cb_def["type"]
+
+                if cb_type == "multi":
+                    # 複数選択チェックボックス
+                    st.caption(cb_label)
+                    _selected = []
+                    _cols = st.columns(len(cb_options))
+                    for idx, opt in enumerate(cb_options):
+                        with _cols[idx]:
+                            if st.checkbox(opt, key=f"cb_{cb_id}_{idx}"):
+                                _selected.append(opt)
+                    # 変数に格納
+                    if cb_id == "large_building":
+                        large_building_checks = _selected
+                    elif cb_id == "explanation_method":
+                        explanation_method_checks = _selected
+                    elif cb_id == "attachments":
+                        attachment_checks = _selected
+                    elif cb_id == "meeting_required":
+                        pass  # 表示のみ（報告書のform_noteに反映済み）
+
+                elif cb_type == "radio":
+                    # 排他選択
+                    _val = st.radio(cb_label, cb_options, horizontal=True,
+                                    key=f"cb_{cb_id}")
+                    if cb_id == "specific_construction":
+                        specific_construction_status = _val
+                    elif cb_id == "rodent_control":
+                        rodent_control_status = _val
+
     else:
         construction_year = ""
         renovation_history = ""
@@ -1296,6 +1347,12 @@ if st.button("書類を一括生成", type="primary", use_container_width=True):
         "subcontractor_name": "",
         "subcontractor_address": "",
         "subcontractor_tel": "",
+        # 解体用チェックボックス値
+        "large_building_checks": large_building_checks,
+        "explanation_method_checks": explanation_method_checks,
+        "attachment_checks": attachment_checks,
+        "specific_construction_status": specific_construction_status,
+        "rodent_control_status": rodent_control_status,
     }
 
     with st.spinner("書類を生成中..."):

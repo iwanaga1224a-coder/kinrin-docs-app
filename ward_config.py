@@ -19,6 +19,86 @@ _DEFAULT = {
     "sign_period": "",
 }
 
+# ========== 解体工事 チェックボックス定義 ==========
+# 各区のひな形に出てくるチェック欄の共通パターン。
+# ward_config の demolition.checkbox_groups で参照する。
+#
+# type:
+#   "radio"  = 排他選択（1つだけ）
+#   "multi"  = 複数選択可
+# appears_in: チェック欄が登場する書類 ("sign"=標識, "report"=報告書, "both")
+# data_key: data 辞書に格納するキー名
+
+DEMOLITION_CHECKBOX_DEFS = {
+    "asbestos": {
+        "id": "asbestos",
+        "label": "石綿（アスベスト）含有建材の有無",
+        "options": ["有り", "無し", "調査中"],
+        "type": "radio",
+        "appears_in": "both",
+        "data_key": "asbestos_status",
+    },
+    "large_building": {
+        "id": "large_building",
+        "label": "大規模建築物等の該当（いずれかに該当する場合チェック）",
+        "options": [
+            "木造以外で3階以上",
+            "地階を有する",
+            "延べ面積500m²以上",
+        ],
+        "type": "multi",
+        "appears_in": "report",
+        "data_key": "large_building_checks",
+    },
+    "explanation_method": {
+        "id": "explanation_method",
+        "label": "近隣説明の方法",
+        "options": ["説明会", "個別訪問", "書面配付（ポスティング）"],
+        "type": "multi",
+        "appears_in": "report",
+        "data_key": "explanation_method_checks",
+    },
+    "attachments": {
+        "id": "attachments",
+        "label": "添付書類",
+        "options": [
+            "案内図（説明範囲をマーキング）",
+            "配布チラシの写し",
+            "標識設置写真（遠景・近景）",
+        ],
+        "type": "multi",
+        "appears_in": "report",
+        "data_key": "attachment_checks",
+    },
+    "specific_construction": {
+        "id": "specific_construction",
+        "label": "特定建設作業（騒音・振動規制法）",
+        "options": ["該当する", "該当しない"],
+        "type": "radio",
+        "appears_in": "report",
+        "data_key": "specific_construction_status",
+    },
+    "rodent_control": {
+        "id": "rodent_control",
+        "label": "ねずみ・害虫の駆除",
+        "options": ["駆除実施済", "駆除予定", "該当なし"],
+        "type": "radio",
+        "appears_in": "report",
+        "data_key": "rodent_control_status",
+    },
+    "meeting_required": {
+        "id": "meeting_required",
+        "label": "説明会の開催義務",
+        "options": ["1,000m²以上", "4階以上", "地階有り"],
+        "type": "multi",
+        "appears_in": "report",
+        "data_key": "meeting_required_checks",
+    },
+}
+
+# 全区共通で使うチェックボックスグループ（最低限）
+_COMMON_CHECKBOX_GROUPS = ["asbestos", "large_building", "explanation_method", "attachments"]
+
 # ========== 23区 ==========
 WARD_CONFIG = {
     "千代田": {
@@ -32,11 +112,21 @@ WARD_CONFIG = {
         "regulation_url": "https://www.city.chiyoda.lg.jp/koho/machizukuri/kenchiku/jizentetsuzuki/chukoso.html",
         "demolition_url": "https://www.city.chiyoda.lg.jp/koho/machizukuri/kenchiku/kisonkenchikubutsu/kaitaikoji.html",
         "demolition": {
+            "ordinance_name": "千代田区建築物の解体工事の事前周知に関する指導要綱",
             "target_area": 80,
             "sign_deadline_wood": 30,
             "sign_deadline_other": 30,
+            "explanation_deadline_wood": 30,
+            "explanation_deadline_other": 30,
+            "sign_report_deadline": 7,
             "requires_submission": True,
-            "form_note": "標識設置後1週間以内に報告書を提出",
+            "form_note": "標識設置は工事開始1ヶ月前。標識設置後1週間以内に報告書を提出",
+            "scope_rule": "敷地境界線から建物高さ相当（最低10m）",
+            "submit_to": "建築指導課",
+            "submit_copies": 2,
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "large_building", "explanation_method", "attachments", "rodent_control"],
+            "extra_explanation_items": ["ねずみ生息状況・駆除対策"],
         },
     },
     "中央": {
@@ -51,11 +141,17 @@ WARD_CONFIG = {
         "regulation_url": "https://www.city.chuo.lg.jp/a0043/machizukuri/kenchiku/kentikutetuzuki/tyuukousou_youkou.html",
         "demolition_url": "https://www.city.chuo.lg.jp/a0043/machizukuri/kenchiku/kentikutetuzuki/kaitai_youkou.html",
         "demolition": {
+            "ordinance_name": "中央区建築物の解体工事の事前周知に関する指導要綱",
             "target_area": 0,
             "sign_deadline_wood": 15,
             "sign_deadline_other": 30,
             "requires_submission": True,
-            "form_note": "解体工事計画の事前周知届を提出",
+            "form_note": "全解体工事が対象（面積要件なし）。第1号様式=標識、第2号様式=標識設置届、第3号様式=説明会報告",
+            "scope_rule": "敷地境界線から建物高さ相当（最低10m）",
+            "submit_to": "都市整備部建築課",
+            "submit_copies": 2,
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "explanation_method", "attachments"],
         },
     },
     "港": {
@@ -69,11 +165,18 @@ WARD_CONFIG = {
         "regulation_url": "https://www.city.minato.tokyo.jp/kenchikufunsou/kennchikufunnsouchoouseitantou/tyuukousou1.html",
         "demolition_url": "https://www.city.minato.tokyo.jp/kenchikufunsou/kankyo-machi/kenchiku/kaitai.html",
         "demolition": {
+            "ordinance_name": "港区建築物の解体工事等に係る計画の事前周知と石綿飛散防止に関する要綱",
             "target_area": 0,
             "sign_deadline_wood": 15,
             "sign_deadline_other": 30,
             "requires_submission": True,
-            "form_note": "解体工事の標識設置届・説明報告書を提出",
+            "form_note": "全解体工事が対象。電子申請（Logoform）で5種類を提出: 石綿事前調査/除去計画/標識設置/説明会/変更",
+            "scope_rule": "敷地境界線から建物高さ相当（最低10m）",
+            "submit_to": "建築紛争調整担当（内線2311）",
+            "submit_copies": 1,
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "explanation_method", "attachments"],
+            "electronic_only": True,
         },
     },
     "新宿": {
@@ -87,11 +190,17 @@ WARD_CONFIG = {
         "regulation_url": "https://www.city.shinjuku.lg.jp/seikatsu/file18_04_00013.html",
         "demolition_url": "https://www.city.shinjuku.lg.jp/seikatsu/file10_10_00001.html",
         "demolition": {
+            "ordinance_name": "新宿区建築物の解体工事の事前周知に関する指導要綱",
             "target_area": 80,
             "sign_deadline_wood": 15,
             "sign_deadline_other": 30,
             "requires_submission": True,
-            "form_note": "解体工事の事前周知届出書を提出",
+            "form_note": "延べ80m²以上が対象。第1号様式=標識、第2号様式=標識設置・説明実施報告書。騒音・振動規制法の特定建設作業該当時は別途届出",
+            "scope_rule": "敷地境界線から建物高さ相当（最低10m）",
+            "submit_to": "生活環境課",
+            "submit_copies": 2,
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "large_building", "explanation_method", "attachments", "specific_construction"],
         },
     },
     "文京": {
@@ -105,11 +214,20 @@ WARD_CONFIG = {
         "regulation_url": "https://www.city.bunkyo.lg.jp/bosai/tochi/hunsou.html",
         "demolition_url": "https://www.city.bunkyo.lg.jp/b037/p005055.html",
         "demolition": {
+            "ordinance_name": "文京区建築物の解体工事の事前周知に関する指導要綱",
             "target_area": 0,
-            "sign_deadline_wood": 15,
+            "sign_deadline_wood": 30,
             "sign_deadline_other": 30,
+            "explanation_deadline_wood": 15,
+            "explanation_deadline_other": 15,
+            "sign_report_deadline": 7,
             "requires_submission": True,
-            "form_note": "解体工事届出書を工事15日前までに提出",
+            "form_note": "全解体工事が対象。標識設置30日前、説明15日前、報告書7日前。石綿含有時は説明範囲が建物高さの2倍（最低15m）に拡大",
+            "scope_rule": "敷地境界線から建物高さ相当（最低10m）、石綿有=高さの2倍（最低15m）",
+            "submit_to": "建築指導課",
+            "submit_copies": 2,
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "explanation_method", "attachments"],
         },
     },
     "台東": {
@@ -123,11 +241,17 @@ WARD_CONFIG = {
         "regulation_url": "https://www.city.taito.lg.jp/kenchiku/jutaku/sumai/funso/yobo.html",
         "demolition_url": "https://www.city.taito.lg.jp/kenchiku/kankyohozen/kogaitaisaku/jizenshuchi/kaitaikoji.html",
         "demolition": {
+            "ordinance_name": "台東区建築物の解体工事の事前周知に関する指導要綱",
             "target_area": 0,
             "sign_deadline_wood": 7,
             "sign_deadline_other": 14,
             "requires_submission": True,
-            "form_note": "工事7日前までに報告書を提出",
+            "form_note": "全解体工事が対象。木造7日前・非木造14日前。様式1=標識、様式2=報告書、様式3=変更届",
+            "scope_rule": "敷地境界線から建物高さ相当（最低10m）",
+            "submit_to": "環境保全課 公害指導係（6F窓口3）",
+            "submit_copies": 2,
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "explanation_method", "attachments"],
         },
     },
     "墨田": {
@@ -141,11 +265,18 @@ WARD_CONFIG = {
         "regulation_url": "https://www.city.sumida.lg.jp/matizukuri/kentiku/keikaku/cyuukouosu.html",
         "demolition_url": "https://www.city.sumida.lg.jp/matizukuri/kentiku/kouji/kaitaisshidouyoukou.html",
         "demolition": {
+            "ordinance_name": "墨田区建築物の解体工事に関する指導要綱",
             "target_area": 80,
             "sign_deadline_wood": 7,
             "sign_deadline_other": 7,
+            "sign_report_deadline": 7,
             "requires_submission": True,
-            "form_note": "工事7日前までに報告書を提出",
+            "form_note": "延べ80m²以上。第1号様式=標識、第2号様式=報告書、第3号様式=変更届。電子申請可",
+            "scope_rule": "敷地境界線から建物高さ相当（最低10m）",
+            "submit_to": "建築指導課 構造担当",
+            "submit_copies": 2,
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "large_building", "explanation_method", "attachments"],
         },
     },
     "江東": {
@@ -159,11 +290,18 @@ WARD_CONFIG = {
         "regulation_url": "https://www.city.koto.lg.jp/395108/machizukuri/kenchiku/tatemono/hunso/7184.html",
         "demolition_url": "https://www.city.koto.lg.jp/395108/machizukuri/kenchiku/kowasu/22166.html",
         "demolition": {
+            "ordinance_name": "江東区建築物の解体工事の事前周知に関する指導要綱",
             "target_area": 80,
             "sign_deadline_wood": 7,
             "sign_deadline_other": 14,
+            "sign_report_deadline": 7,
             "requires_submission": True,
-            "form_note": "工事7日前までに届出書を提出",
+            "form_note": "延べ80m²以上。標識14日前（木造7日前）。報告書は着手7日前。第1号=標識(A3以上)、第2号=報告書、第3号=変更届",
+            "scope_rule": "敷地境界線から建物高さ相当（10m未満は10m）",
+            "submit_to": "建築調整課 建築紛争係",
+            "submit_copies": 2,
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "large_building", "explanation_method", "attachments"],
         },
     },
     "品川": {
@@ -177,11 +315,18 @@ WARD_CONFIG = {
         "regulation_url": "http://www.city.shinagawa.tokyo.jp/PC/kankyo/kankyo-toshiseibi/kankyo-toshiseibi-hunnsouyobou/hpg000016196.html",
         "demolition_url": "https://www.city.shinagawa.tokyo.jp/PC/kankyo/kankyo-toshiseibi/kankyo-toshiseibi-hunnsouyobou/hpg000016203.html",
         "demolition": {
+            "ordinance_name": "品川区建築物の解体工事に係る計画の事前周知に関する要綱",
             "target_area": 80,
             "sign_deadline_wood": 10,
             "sign_deadline_other": 14,
             "requires_submission": True,
-            "form_note": "標識設置届＋説明報告書を提出",
+            "form_note": "延べ80m²以上。500m²以上/3階以上(非木造)/地階有は14日前、その他10日前。第1号=標識、第2号=標識設置届、第5号=説明会報告書",
+            "large_building_criteria": "床面積500m²以上、階数3以上（木造除く）、地階有り（半地下除く）",
+            "scope_rule": "敷地境界線から10mまたは建物高さの等倍のうち広い方",
+            "submit_to": "住宅課 開発指導担当",
+            "submit_copies": 2,
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "large_building", "explanation_method", "attachments"],
         },
     },
     "目黒": {
@@ -195,11 +340,17 @@ WARD_CONFIG = {
         "regulation_url": "https://www.city.meguro.tokyo.jp/toshikeikaku/kusei/onlineservice/hyoshiki_chukoso.html",
         "demolition_url": "https://www.city.meguro.tokyo.jp/kankyouhozen/kusei/onlineservice/yosiki-kaitaitodoke.html",
         "demolition": {
+            "ordinance_name": "目黒区建築物の解体工事の事前周知に関する指導要綱",
             "target_area": 80,
             "sign_deadline_wood": 15,
             "sign_deadline_other": 15,
             "requires_submission": True,
-            "form_note": "工事5日前までに届出書を提出",
+            "form_note": "延べ80m²以上。Excel作成ツールあり（入力シートで標識+届出を自動生成）。オンライン申請可",
+            "scope_rule": "敷地境界線から建物高さ相当（最低10m）",
+            "submit_to": "環境保全課 公害対策係",
+            "submit_copies": 2,
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "explanation_method", "attachments"],
         },
     },
     "大田": {
@@ -213,11 +364,20 @@ WARD_CONFIG = {
         "regulation_url": "https://www.city.ota.tokyo.jp/seikatsu/sumaimachinami/kenchiku/chuukousou_seido/hyousikisetumei.html",
         "demolition_url": "https://www.city.ota.tokyo.jp/seikatsu/sumaimachinami/kenchiku/kensetsurecycle.html",
         "demolition": {
+            "ordinance_name": "大田区建築物の解体工事の事前周知に関する指導要綱",
             "target_area": 80,
-            "sign_deadline_wood": 10,
-            "sign_deadline_other": 10,
+            "sign_deadline_wood": 7,
+            "sign_deadline_other": 7,
+            "sign_report_deadline": 3,
             "requires_submission": True,
-            "form_note": "500m²以上等は報告書必要",
+            "form_note": "延べ80m²以上。標識・説明とも7日前、報告書3日前。ただし3階未満/地階なし/500m²未満は報告書省略可",
+            "large_building_criteria": "3階以上、地階有り、延べ500m²以上のいずれか（報告書必須）",
+            "scope_rule": "敷地境界線から建物高さ相当（最低10m）",
+            "submit_to": "建築調整課 建築相談担当",
+            "submit_copies": 2,
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "large_building", "explanation_method", "attachments"],
+            "report_optional_small": True,
         },
     },
     "世田谷": {
@@ -231,11 +391,17 @@ WARD_CONFIG = {
         "regulation_url": "https://www.city.setagaya.lg.jp/02034/3773.html",
         "demolition_url": "https://www.city.setagaya.lg.jp/01101/4817.html",
         "demolition": {
+            "ordinance_name": "世田谷区建築物の解体工事に係る事前周知に関する指導要綱",
             "target_area": 80,
             "sign_deadline_wood": 7,
             "sign_deadline_other": 7,
             "requires_submission": True,
-            "form_note": "建リ法届出に記載で報告書省略可（R7.4.1〜）",
+            "form_note": "延べ80m²以上。特定建設作業/建リ法/石綿の該当で標識パターンが異なる。第1号=特定建設作業用、第2号=石綿用、第3号=報告書",
+            "scope_rule": "敷地境界線から15m（建物15m超はその高さ）",
+            "submit_to": "環境保全課",
+            "submit_copies": 2,
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "specific_construction", "explanation_method", "attachments"],
         },
     },
     "渋谷": {
@@ -249,11 +415,20 @@ WARD_CONFIG = {
         "regulation_url": "https://www.city.shibuya.tokyo.jp/kankyo/kenchiku/kenchiku-jorei/hunsou.html",
         "demolition_url": "https://www.city.shibuya.tokyo.jp/kankyo/kogai/kogai-sodan/kaitai.html",
         "demolition": {
+            "ordinance_name": "渋谷区建築物の解体工事に係る計画の事前周知に関する条例",
             "target_area": 80,
             "sign_deadline_wood": 30,
             "sign_deadline_other": 30,
+            "explanation_deadline_wood": 15,
+            "explanation_deadline_other": 15,
+            "sign_report_deadline": 5,
             "requires_submission": True,
-            "form_note": "条例に基づく標識設置届＋説明報告書を提出",
+            "form_note": "延べ80m²以上 or 吹付け石綿含有。条例に基づく（要綱でなく条例）。標識30日前、説明15日前、報告10日前。5様式: 解体計画届/標識/標識設置届/説明会報告/変更届",
+            "scope_rule": "敷地境界線から建物高さ相当（最低10m）",
+            "submit_to": "環境政策課",
+            "submit_copies": 2,
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "large_building", "explanation_method", "attachments"],
         },
     },
     "中野": {
@@ -267,11 +442,17 @@ WARD_CONFIG = {
         "regulation_url": "https://www.city.tokyo-nakano.lg.jp/machizukuri/kenchiku/tetsuzuki/kenchikufunso/kenchikufunso.html",
         "demolition_url": "https://www.city.tokyo-nakano.lg.jp/machizukuri/kenchiku/tetsuzuki/kaitai/kaitaikoji.html",
         "demolition": {
+            "ordinance_name": "中野区建築物の解体工事の事前周知に関する指導要綱",
             "target_area": 0,
             "sign_deadline_wood": 7,
             "sign_deadline_other": 7,
             "requires_submission": True,
-            "form_note": "80m²以上は建リ法届出に写真添付、80m²未満は別途届出",
+            "form_note": "全解体工事が対象。A3以上の標識を7日前に設置。80m²以上は建リ法届出に写真添付、80m²未満は別途届出。R7年3月〜ねずみ駆除も義務化",
+            "scope_rule": "敷地境界線から建物高さ相当（最低10m）",
+            "submit_to": "環境部 環境課",
+            "submit_copies": 2,
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "explanation_method", "attachments", "rodent_control"],
         },
     },
     "杉並": {
@@ -285,11 +466,17 @@ WARD_CONFIG = {
         "regulation_url": "https://www.city.suginami.tokyo.jp/s092/1890.html",
         "demolition_url": "https://www.city.suginami.tokyo.jp/s102/682.html",
         "demolition": {
+            "ordinance_name": "杉並区建築物の解体工事の事前周知に関する指導要綱",
             "target_area": 80,
             "sign_deadline_wood": 7,
             "sign_deadline_other": 7,
             "requires_submission": True,
-            "form_note": "工事7日前までに届出書を提出",
+            "form_note": "延べ80m²以上。7日前にA3以上の標識設置+説明実施。大気汚染防止法の掲示様式を参考に作成。説明範囲: 境界から15m（建物15m超はその高さ）",
+            "scope_rule": "敷地境界線から15m（建物が15m以上の場合はその高さ）",
+            "submit_to": "環境課",
+            "submit_copies": 2,
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "explanation_method", "attachments"],
         },
     },
     "豊島": {
@@ -303,11 +490,16 @@ WARD_CONFIG = {
         "regulation_url": "https://www.city.toshima.lg.jp/314/machizukuri/sumai/kekaku/tateru/013325.html",
         "demolition_url": "https://www.city.toshima.lg.jp/153/machizukuri/sumai/oshirase/1503121236.html",
         "demolition": {
+            "ordinance_name": "豊島区建築物の解体工事の事前周知に関する指導要綱",
             "target_area": 0,
             "sign_deadline_wood": 7,
             "sign_deadline_other": 7,
             "requires_submission": False,
-            "form_note": "R6年度〜届出不要（掲示のみ必要）",
+            "form_note": "R6年度〜区への届出不要（掲示のみ必須）。A3以上。石綿事前調査結果報告は都道府県へ。80m²以上は建リ法届出別途",
+            "scope_rule": "敷地境界線から建物高さ相当",
+            "submit_to": "環境保全課 公害対策グループ（届出不要・相談のみ）",
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "explanation_method"],
         },
     },
     "北": {
@@ -321,11 +513,17 @@ WARD_CONFIG = {
         "regulation_url": "https://www.city.kita.lg.jp/dev-environment/construction/1018294/1009335.html",
         "demolition_url": "https://www.city.kita.lg.jp/dev-environment/construction/1009340/1009342.html",
         "demolition": {
+            "ordinance_name": "東京都北区建築物の解体工事の事前周知に関する指導要綱",
             "target_area": 80,
             "sign_deadline_wood": 15,
             "sign_deadline_other": 30,
             "requires_submission": True,
-            "form_note": "工事7日前までに届出書を提出",
+            "form_note": "延べ80m²以上。木造15日前・非木造30日前。1号=標識(Word/PDF)、2号=標識設置報告書、3号=説明会報告書。電子申請R7.11〜",
+            "scope_rule": "敷地境界線から建物高さ相当（最低10m）",
+            "submit_to": "住宅課 住宅政策係",
+            "submit_copies": 2,
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "large_building", "explanation_method", "attachments"],
         },
     },
     "荒川": {
@@ -339,11 +537,20 @@ WARD_CONFIG = {
         "regulation_url": "https://www.city.arakawa.tokyo.jp/a041/machizukuridoboku/kenchikukaihatsu/funnsoujourei.html",
         "demolition_url": "https://www.city.arakawa.tokyo.jp/a044/machizukuridoboku/kenchikukaihatsu/yoko.html",
         "demolition": {
+            "ordinance_name": "荒川区建築物の解体工事に係る紛争の予防と調整に関する条例",
             "target_area": 80,
             "sign_deadline_wood": 7,
             "sign_deadline_other": 14,
+            "sign_report_deadline": 7,
             "requires_submission": True,
-            "form_note": "標識設置後翌日から木造3日以内・非木造7日以内に報告",
+            "form_note": "延べ80m²以上 or 石綿含有。非木造14日前/木造7日前。報告は設置翌日から木造3日以内・非木造7日以内。1000m²以上/4階以上/地階有は説明会必須",
+            "large_building_criteria": "1,000m²以上、4階以上、地階有り（説明会義務）",
+            "scope_rule": "敷地境界線から建物高さ相当（最低10m）",
+            "submit_to": "建築指導課 審査係",
+            "submit_copies": 1,
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "large_building", "explanation_method", "attachments", "meeting_required"],
+            "electronic_only": True,
         },
     },
     "板橋": {
@@ -357,11 +564,17 @@ WARD_CONFIG = {
         "regulation_url": "https://www.city.itabashi.tokyo.jp/bousai/tochi/jorei/1006203.html",
         "demolition_url": "https://www.city.itabashi.tokyo.jp/bousai/kougai/kougai/1006034.html",
         "demolition": {
+            "ordinance_name": "板橋区建築物解体工事の生活環境保全指導要綱",
             "target_area": 80,
             "sign_deadline_wood": 7,
             "sign_deadline_other": 7,
             "requires_submission": True,
-            "form_note": "建リ法届出時に済シール交付",
+            "form_note": "延べ80m²以上。建リ法届出時に済シール交付。要綱に基づく事前説明+環境保全措置が必要",
+            "scope_rule": "敷地境界線から建物高さ相当（最低10m）",
+            "submit_to": "資源環境部 環境政策課",
+            "submit_copies": 2,
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "explanation_method", "attachments"],
         },
     },
     "練馬": {
@@ -375,11 +588,17 @@ WARD_CONFIG = {
         "regulation_url": "https://www.city.nerima.tokyo.jp/jigyoshamuke/jigyosha/doboku/yobo.html",
         "demolition_url": "https://www.city.nerima.tokyo.jp/kusei/omonajorei/kankyo/asbestos/koujitodokede.html",
         "demolition": {
+            "ordinance_name": "練馬区石綿飛散防止条例に基づく解体工事届出",
             "target_area": 80,
             "sign_deadline_wood": 14,
             "sign_deadline_other": 14,
             "requires_submission": True,
-            "form_note": "アスベスト飛散防止条例に基づく届出",
+            "form_note": "延べ80m²以上。標識14日前に設置（接道部・高さ1m）。説明範囲: 境界から建物高さの2倍。事前調査は有資格者のみ",
+            "scope_rule": "敷地境界線から建物高さの2倍",
+            "submit_to": "環境課",
+            "submit_copies": 2,
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "explanation_method", "attachments"],
         },
     },
     "足立": {
@@ -407,6 +626,7 @@ WARD_CONFIG = {
             "submit_to": "建築室 建築審査課 建設リサイクル担当",
             "submit_copies": 2,
             "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "large_building", "explanation_method", "attachments"],
             "template_urls": {
                 "sign": "https://www.city.adachi.tokyo.jp/documents/2789/hp1gou.doc",
                 "report": "https://www.city.adachi.tokyo.jp/documents/2789/hphoukoku.doc",
@@ -426,11 +646,17 @@ WARD_CONFIG = {
         "regulation_url": "https://www.city.katsushika.lg.jp/business/1000011/1000069/1005250/1005333.html",
         "demolition_url": "https://www.city.katsushika.lg.jp/kurashi/1000062/1003884/1003961.html",
         "demolition": {
+            "ordinance_name": "葛飾区建築物の解体工事の事前周知に関する指導要綱",
             "target_area": 80,
             "sign_deadline_wood": 7,
             "sign_deadline_other": 7,
             "requires_submission": True,
-            "form_note": "周知終了後すみやかに報告書を提出",
+            "form_note": "延べ80m²以上 or 大気汚染防止法対象の石綿除去工事。7日前。報告書2部。R7.4書類改訂、R7.11電子申請開始",
+            "scope_rule": "敷地境界線から建物高さ相当（最低10m）",
+            "submit_to": "環境課 公害対策係",
+            "submit_copies": 2,
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "explanation_method", "attachments"],
         },
     },
     "江戸川": {
@@ -444,11 +670,17 @@ WARD_CONFIG = {
         "regulation_url": "https://www.city.edogawa.tokyo.jp/e016/toshikeikaku/kenchiku/ruletokyogi/funsoujorei.html",
         "demolition_url": "https://www.city.edogawa.tokyo.jp/e024/toshikeikaku/kankyo/kogai/joho8.html",
         "demolition": {
+            "ordinance_name": "江戸川区建築物等の解体及びアスベスト処理工事の事前周知等に関する要綱",
             "target_area": 80,
             "sign_deadline_wood": 7,
             "sign_deadline_other": 7,
             "requires_submission": True,
-            "form_note": "事前周知届出書を提出",
+            "form_note": "大気汚染防止法対象の石綿調査対象工事 or 騒音・振動規制対象の解体工事。7日前。接道ごとにA3以上の標識掲示。Excel様式（石綿レベル別）",
+            "scope_rule": "敷地境界線から建物高さ相当（最低10m）",
+            "submit_to": "環境課 指導係",
+            "submit_copies": 2,
+            "asbestos_required": True,
+            "checkbox_groups": ["asbestos", "specific_construction", "explanation_method", "attachments"],
         },
     },
 
@@ -957,6 +1189,25 @@ def get_ward_config(ward_name):
         if ward_name:
             result["ordinance_name"] = f"{ward_name}区中高層建築物の建築に係る紛争の予防と調整に関する条例"
 
+    return result
+
+
+def get_demolition_checkboxes(ward_name):
+    """区の解体工事で使用するチェックボックスグループ定義を返す
+
+    Returns:
+        list[dict]: チェックボックスグループのリスト。
+        各要素は DEMOLITION_CHECKBOX_DEFS の定義に準拠。
+    """
+    wc = get_ward_config(ward_name)
+    demo_cfg = wc.get("demolition", {})
+    group_ids = demo_cfg.get("checkbox_groups", _COMMON_CHECKBOX_GROUPS)
+
+    result = []
+    for gid in group_ids:
+        defn = DEMOLITION_CHECKBOX_DEFS.get(gid)
+        if defn:
+            result.append(defn)
     return result
 
 

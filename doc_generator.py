@@ -15,7 +15,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml.ns import qn
 
-from ward_config import get_ward_config
+from ward_config import get_ward_config, get_demolition_checkboxes, DEMOLITION_CHECKBOX_DEFS
 from template_filler import fill_sign_notice as _fill_official_sign_notice
 from template_filler import fill_explanation_report as _fill_official_report
 
@@ -57,6 +57,31 @@ def _add_body_paragraph(doc, text, font_size=10.5, bold=False, align=WD_ALIGN_PA
     run._element.rPr.rFonts.set(qn("w:eastAsia"), "游ゴシック")
     run.bold = bold
     return p
+
+
+def _render_checks(options, selected, separator="　　"):
+    """チェックボックスリストを ☑/□ テキストに変換
+
+    Args:
+        options: 選択肢のリスト ["有り", "無し", "調査中"]
+        selected: 選択された値（str or list）
+        separator: 選択肢間の区切り文字
+    Returns:
+        str: "☑ 有り　　□ 無し　　□ 調査中"
+    """
+    if isinstance(selected, str):
+        selected = [selected]
+    parts = []
+    for opt in options:
+        mark = "☑" if opt in selected else "□"
+        parts.append(f"{mark} {opt}")
+    return separator.join(parts)
+
+
+def _set_cell_with_checks(cell, options, selected, font_size=10, separator="　　"):
+    """セルにチェックボックス付きテキストを設定"""
+    text = _render_checks(options, selected, separator)
+    _set_cell(cell, text, font_size=font_size)
 
 
 def _set_table_borders(table):
@@ -179,6 +204,18 @@ def generate_demolition_sign(data, output_path):
     _add_heading_paragraph(doc, "解 体 工 事 の お 知 ら せ", font_size=22)
     _add_body_paragraph(doc, "", space_after=8)
 
+    # --- 石綿のチェック状態 ---
+    _asb_raw = data.get("asbestos_status", "調査中")
+    _asb_checks = _render_checks(["有り", "無し", "調査中"], _asb_raw)
+
+    # --- 大規模建築物チェック ---
+    _lb_checks_raw = data.get("large_building_checks", [])
+    if isinstance(_lb_checks_raw, str):
+        _lb_checks_raw = [x.strip() for x in _lb_checks_raw.split(",") if x.strip()]
+    _lb_text = _render_checks(
+        ["木造以外で3階以上", "地階を有する", "延べ面積500m²以上"],
+        _lb_checks_raw, separator="\n")
+
     # メインテーブル
     rows_data = [
         ("解体建築物の所在地", data.get("site_address", "")),
@@ -195,13 +232,17 @@ def generate_demolition_sign(data, output_path):
         ("工事業者　氏　名", data.get("constructor_name", "")),
         ("　　　　　住　所", data.get("constructor_address", "")),
         ("　　　　　連絡先", data.get("constructor_tel", "")),
-        ("石綿等の使用の有無", data.get("asbestos_status", "□ 有り　□ 無し　□ 調査中")),
+        ("石綿等の使用の有無", _asb_checks),
         ("石綿等の除去方法", data.get("asbestos_removal_method", "")),
         ("安全対策・公害防止対策", data.get("safety_measures",
             "・仮囲い・防音パネルの設置\n・散水による粉塵防止\n・交通誘導員の配置")),
         ("搬出経路", data.get("transport_route", "")),
         ("工事車両通行経路", data.get("vehicle_route", "")),
     ]
+
+    # 大規模建築物チェックが区で必要な場合は行を追加
+    if "large_building" in demo_cfg.get("checkbox_groups", []):
+        rows_data.insert(4, ("大規模建築物等", _lb_text))
 
     table = doc.add_table(rows=len(rows_data), cols=2)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -377,24 +418,33 @@ def generate_demolition_report(data, output_path):
     # Row 14: 説明時期
     _set_cell(table.cell(14, 2), "説明時期", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
     _merge_cells_and_set(table, 14, 3, 14, 5, data.get("explanation_date", ""), 10)
-    # Row 15: 実施方法
+    # Row 15: 実施方法（☑/□ チェックボックス）
     _set_cell(table.cell(15, 2), "実施方法", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
-    # チェックボックス風の表示
-    _method = data.get("explanation_method", "個別訪問による説明")
-    _chk_meeting = "■" if "説明会" in _method else "□"
-    _chk_visit = "■" if "個別訪問" in _method else "□"
-    _chk_paper = "■" if "書面" in _method or "ポスティング" in _method else "□"
-    _merge_cells_and_set(table, 15, 3, 15, 5,
-        f"{_chk_meeting} 説明会　　{_chk_visit} 個別訪問　　{_chk_paper} 書面配付", 10)
+    _method_checks = data.get("explanation_method_checks", [])
+    if not _method_checks:
+        # 旧形式（テキスト）からの変換
+        _method = data.get("explanation_method", "個別訪問による説明")
+        if "説明会" in _method:
+            _method_checks.append("説明会")
+        if "個別訪問" in _method:
+            _method_checks.append("個別訪問")
+        if "書面" in _method or "ポスティング" in _method:
+            _method_checks.append("書面配付（ポスティング）")
+    _method_text = _render_checks(["説明会", "個別訪問", "書面配付（ポスティング）"], _method_checks)
+    _merge_cells_and_set(table, 15, 3, 15, 5, _method_text, 10)
 
-    # --- Row 16-18: 添付書類 ---
+    # --- Row 16-18: 添付書類（☑/□ チェックボックス） ---
     _merge_cells_and_set(table, 16, 0, 18, 1, "添 付 書 類", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
-    _merge_cells_and_set(table, 16, 2, 16, 5,
-        "□ 案内図（説明を行った家等が分かるようにマーキングすること）", 9)
-    _merge_cells_and_set(table, 17, 2, 17, 5,
-        "□ 説明に使用したチラシ等（近隣説明範囲図を含む）", 9)
-    _merge_cells_and_set(table, 18, 2, 18, 5,
-        "※ 工事対象建物の写真（遠景、近景等）があれば、添付してください。", 8)
+    _att_checks = data.get("attachment_checks", [])
+    _att_opts = [
+        ("案内図（説明範囲をマーキング）", "案内図（説明を行った家等が分かるようにマーキングすること）"),
+        ("配布チラシの写し", "説明に使用したチラシ等（近隣説明範囲図を含む）"),
+        ("標識設置写真（遠景・近景）", "工事対象建物の写真（遠景、近景等）"),
+    ]
+    for idx, (check_key, display_text) in enumerate(_att_opts):
+        _mark = "☑" if check_key in _att_checks else "□"
+        _merge_cells_and_set(table, 16 + idx, 2, 16 + idx, 5,
+            f"{_mark} {display_text}", 9)
 
     _add_body_paragraph(doc, "", space_after=4)
 
@@ -415,12 +465,13 @@ def generate_demolition_report(data, output_path):
             tbl_sign.cell(i, 1).width = Cm(13.0)
         _add_body_paragraph(doc, "※ 標識設置状況の写真を別紙に添付してください。", font_size=8, space_after=6)
 
-    # --- 石綿等の調査結果（足立区の要綱第6条で事前調査が必要） ---
+    # --- 石綿等の調査結果（要綱で事前調査が必要） ---
     _asbestos = data.get("asbestos_status", "")
     if _asbestos:
         _add_body_paragraph(doc, "【石綿等の調査結果】", font_size=10, bold=True, space_after=4)
+        _asb_display = _render_checks(["有り", "無し", "調査中"], _asbestos)
         asbestos_rows = [
-            ("石綿等の使用の有無", _asbestos),
+            ("石綿等の使用の有無", _asb_display),
             ("石綿等の除去方法", data.get("asbestos_removal_method", "該当なし")),
         ]
         tbl_asb = doc.add_table(rows=len(asbestos_rows), cols=2)
@@ -432,6 +483,31 @@ def generate_demolition_report(data, output_path):
             tbl_asb.cell(i, 0).width = Cm(4.0)
             tbl_asb.cell(i, 1).width = Cm(13.0)
         _add_body_paragraph(doc, "", space_after=4)
+
+    # --- 大規模建築物等チェック ---
+    _cb_groups = _demo_cfg.get("checkbox_groups", []) if _demo_cfg else []
+    if "large_building" in _cb_groups:
+        _lb_raw = data.get("large_building_checks", [])
+        if isinstance(_lb_raw, str):
+            _lb_raw = [x.strip() for x in _lb_raw.split(",") if x.strip()]
+        _lb_def = DEMOLITION_CHECKBOX_DEFS["large_building"]
+        _add_body_paragraph(doc, "【大規模建築物等の該当】", font_size=10, bold=True, space_after=4)
+        _lb_display = _render_checks(_lb_def["options"], _lb_raw, separator="　　")
+        _add_body_paragraph(doc, f"　{_lb_display}", font_size=10, space_after=6)
+
+    # --- 特定建設作業チェック ---
+    if "specific_construction" in _cb_groups:
+        _sc_val = data.get("specific_construction_status", "")
+        _sc_display = _render_checks(["該当する", "該当しない"], _sc_val)
+        _add_body_paragraph(doc, "【特定建設作業（騒音・振動規制法）】", font_size=10, bold=True, space_after=4)
+        _add_body_paragraph(doc, f"　{_sc_display}", font_size=10, space_after=6)
+
+    # --- ねずみ駆除チェック ---
+    if "rodent_control" in _cb_groups:
+        _rc_val = data.get("rodent_control_status", "")
+        _rc_display = _render_checks(["駆除実施済", "駆除予定", "該当なし"], _rc_val)
+        _add_body_paragraph(doc, "【ねずみ・害虫の駆除】", font_size=10, bold=True, space_after=4)
+        _add_body_paragraph(doc, f"　{_rc_display}", font_size=10, space_after=6)
 
     # --- 備考 ---
     _submit_copies = _demo_cfg.get("submit_copies", 2) if _demo_cfg else 2
