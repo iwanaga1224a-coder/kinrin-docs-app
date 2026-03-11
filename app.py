@@ -233,8 +233,53 @@ st.sidebar.caption("届出前に必ず管轄窓口で内容をご確認くださ
 # ========== STEP 1：住所入力 ==========
 st.markdown('<div class="step-header"><div class="step-number">1</div><div class="step-title">工事場所</div></div>', unsafe_allow_html=True)
 
+# --- 書類アップロードによる自動入力 ---
+from ocr_extractor import is_available as ocr_available, extract_from_file, EXTRACT_FIELDS
+
+with st.expander("📄 書類をアップロードして自動入力", expanded=False):
+    st.caption(
+        "建築確認申請書・工事看板の写真・契約書などをアップロードすると、"
+        "AI（Gemini）が読み取ってフォームに自動入力します。入力後に手動で修正もできます。"
+    )
+    if not ocr_available():
+        st.warning("⚠️ Gemini APIキーが設定されていないため、この機能は利用できません。")
+    else:
+        uploaded_file = st.file_uploader(
+            "PDF・画像ファイルをアップロード",
+            type=["pdf", "png", "jpg", "jpeg", "webp", "bmp", "tiff"],
+            key="ocr_upload",
+        )
+        if uploaded_file is not None:
+            if st.button("📖 読み取り開始", type="primary"):
+                with st.spinner("AIが書類を読み取り中...（10〜20秒）"):
+                    file_bytes = uploaded_file.read()
+                    extracted, raw = extract_from_file(
+                        file_bytes, uploaded_file.name, uploaded_file.type
+                    )
+                if extracted:
+                    # session_stateに保存 → 各フォームのdefault値として使用
+                    for key, val in extracted.items():
+                        if val:
+                            st.session_state[f"_ocr_{key}"] = val
+                    filled_count = sum(1 for v in extracted.values() if v)
+                    st.success(f"✅ {filled_count} 項目を読み取りました！下のフォームに自動入力されています。")
+                    with st.expander("読み取り結果の詳細", expanded=False):
+                        for key, val in extracted.items():
+                            if val:
+                                label = EXTRACT_FIELDS.get(key, key)
+                                st.markdown(f"- **{label}**: {val}")
+                else:
+                    st.error("読み取れませんでした。")
+                    with st.expander("エラー詳細"):
+                        st.code(raw)
+
+def _ocr_val(field_id, fallback=""):
+    """OCRで読み取った値があればそれを返す（手動入力で上書き可）"""
+    return st.session_state.get(f"_ocr_{field_id}", fallback)
+
 site_address = st.text_input(
     "工事場所（住所） *",
+    value=_ocr_val("site_address"),
     placeholder="東京都新宿区西新宿2-8-1",
 )
 
@@ -803,16 +848,17 @@ tab1, tab2, tab3, tab4 = st.tabs([
 ])
 
 with tab1:
-    site_name = st.text_input("工事名称 *", placeholder="○○ビル解体工事", key="_site_name_val")
+    site_name = st.text_input("工事名称 *", value=_ocr_val("site_name"), placeholder="○○ビル解体工事", key="_site_name_val")
     col1, col2 = st.columns(2)
     with col1:
-        building_name = st.text_input("建物名称", placeholder="○○ビル", help=_field_help("building_name"))
+        building_name = st.text_input("建物名称", value=_ocr_val("building_name"), placeholder="○○ビル", help=_field_help("building_name"))
         building_use = st.text_input(
             "主要用途" if not is_demolition else "既存建物の用途",
-            placeholder="事務所", help=_field_help("building_use"),
+            value=_ocr_val("building_use"), placeholder="事務所", help=_field_help("building_use"),
         )
         work_content = st.text_input(
             "工事内容",
+            value=_ocr_val("work_content"),
             placeholder="RC造建物の解体工事" if is_demolition else "鉄筋コンクリート造建物の新築工事",
             help=_field_help("work_content"),
         )
@@ -834,18 +880,18 @@ with tab1:
                 "基礎工法",
                 ["杭基礎", "直接基礎（べた基礎）", "直接基礎（独立基礎）", "直接基礎（布基礎）", "その他"],
             )
-        floors_above = st.text_input("地上階数", placeholder="6", help=_field_help("floors_above"))
-        floors_below = st.text_input("地下階数", placeholder="1", help=_field_help("floors_below"))
+        floors_above = st.text_input("地上階数", value=_ocr_val("floors_above"), placeholder="6", help=_field_help("floors_above"))
+        floors_below = st.text_input("地下階数", value=_ocr_val("floors_below"), placeholder="1", help=_field_help("floors_below"))
 
     col3, col4, col5, col6 = st.columns(4)
     with col3:
-        height = st.text_input("高さ（m）", placeholder="22.5", help=_field_help("height"))
+        height = st.text_input("高さ（m）", value=_ocr_val("height"), placeholder="22.5", help=_field_help("height"))
     with col4:
-        site_area = st.text_input("敷地面積（㎡）", placeholder="500.00", help=_field_help("site_area"))
+        site_area = st.text_input("敷地面積（㎡）", value=_ocr_val("site_area"), placeholder="500.00", help=_field_help("site_area"))
     with col5:
-        building_area = st.text_input("建築面積（㎡）", placeholder="350.00", help=_field_help("building_area"))
+        building_area = st.text_input("建築面積（㎡）", value=_ocr_val("building_area"), placeholder="350.00", help=_field_help("building_area"))
     with col6:
-        total_floor_area = st.text_input("延べ面積（㎡）", placeholder="2,100.00", help=_field_help("total_floor_area"))
+        total_floor_area = st.text_input("延べ面積（㎡）", value=_ocr_val("total_floor_area"), placeholder="2,100.00", help=_field_help("total_floor_area"))
 
     # 敷地情報（区の様式で必要な場合のみ表示）
     _show_land = _show("land_number") or _show("zoning") or _show("fire_zone") or _show("other_zone")
@@ -877,28 +923,28 @@ with tab2:
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("工期")
-        start_date = st.text_input("着工予定日", placeholder="令和8年5月1日", help=_field_help("start_date"))
-        end_date = st.text_input("完了予定日", placeholder="令和8年10月31日", help=_field_help("end_date"))
+        start_date = st.text_input("着工予定日", value=_ocr_val("start_date"), placeholder="令和8年5月1日", help=_field_help("start_date"))
+        end_date = st.text_input("完了予定日", value=_ocr_val("end_date"), placeholder="令和8年10月31日", help=_field_help("end_date"))
 
         st.subheader("届出者（発注者・建築主）")
-        applicant_name = st.text_input("届出者 氏名", placeholder="株式会社 ○○建設　代表取締役　○○ ○○", help=_field_help("applicant_name"))
-        applicant_address = st.text_input("届出者 住所", placeholder="東京都千代田区○○1-1-1", help=_field_help("applicant_address"))
-        applicant_tel = st.text_input("届出者 電話", placeholder="03-0000-0001", help=_field_help("applicant_tel"))
+        applicant_name = st.text_input("届出者 氏名", value=_ocr_val("applicant_name"), placeholder="株式会社 ○○建設　代表取締役　○○ ○○", help=_field_help("applicant_name"))
+        applicant_address = st.text_input("届出者 住所", value=_ocr_val("applicant_address"), placeholder="東京都千代田区○○1-1-1", help=_field_help("applicant_address"))
+        applicant_tel = st.text_input("届出者 電話", value=_ocr_val("applicant_tel"), placeholder="03-0000-0001", help=_field_help("applicant_tel"))
 
     with col2:
         st.subheader("設計者")
         if is_demolition:
             st.caption("解体工事では設計者情報は不要です")
-        designer_name = st.text_input("設計者名", placeholder="○○設計事務所", help=_field_help("designer_name"), disabled=is_demolition)
-        designer_tel = st.text_input("設計者 電話", placeholder="03-0000-0002", help=_field_help("designer_tel"), disabled=is_demolition)
+        designer_name = st.text_input("設計者名", value=_ocr_val("designer_name"), placeholder="○○設計事務所", help=_field_help("designer_name"), disabled=is_demolition)
+        designer_tel = st.text_input("設計者 電話", value=_ocr_val("designer_tel"), placeholder="03-0000-0002", help=_field_help("designer_tel"), disabled=is_demolition)
         if is_demolition:
             designer_name = ""
             designer_tel = ""
 
         st.subheader("施工者")
-        constructor_name = st.text_input("施工者名", placeholder="○○建設 株式会社", help=_field_help("constructor_name"))
-        constructor_tel = st.text_input("施工者 電話", placeholder="03-1234-5678", help=_field_help("constructor_tel"))
-        site_manager = st.text_input("現場責任者", placeholder="○○ ○○", help=_field_help("site_manager"))
+        constructor_name = st.text_input("施工者名", value=_ocr_val("constructor_name"), placeholder="○○建設 株式会社", help=_field_help("constructor_name"))
+        constructor_tel = st.text_input("施工者 電話", value=_ocr_val("constructor_tel"), placeholder="03-1234-5678", help=_field_help("constructor_tel"))
+        site_manager = st.text_input("現場責任者", value=_ocr_val("site_manager"), placeholder="○○ ○○", help=_field_help("site_manager"))
 
 with tab3:
     col1, col2 = st.columns(2)
