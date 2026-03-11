@@ -239,7 +239,7 @@ from ocr_extractor import is_available as ocr_available, extract_from_file, EXTR
 with st.expander("📄 書類をアップロードして自動入力", expanded=False):
     st.caption(
         "建築確認申請書・工事看板の写真・契約書などをアップロードすると、"
-        "AI（Gemini）が読み取ってフォームに自動入力します。入力後に手動で修正もできます。"
+        "システムが自動で読み取りフォームに入力します。入力後に手動で修正もできます。"
     )
     if not ocr_available():
         st.warning("⚠️ Gemini APIキーが設定されていないため、この機能は利用できません。")
@@ -251,7 +251,7 @@ with st.expander("📄 書類をアップロードして自動入力", expanded=
         )
         if uploaded_file is not None:
             if st.button("📖 読み取り開始", type="primary"):
-                with st.spinner("AIが書類を読み取り中...（10〜20秒）"):
+                with st.spinner("システムが書類情報を整理中...（10〜20秒）"):
                     file_bytes = uploaded_file.read()
                     extracted, raw = extract_from_file(
                         file_bytes, uploaded_file.name, uploaded_file.type
