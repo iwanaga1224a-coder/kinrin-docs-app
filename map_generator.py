@@ -139,7 +139,7 @@ def generate_map_html(site_name, address, lat, lng, radius_m=50, zoom_override=N
         <b>凡例</b><br>
         <span style="color:red;">&#9733;</span> 工事現場<br>
         <span style="color:red;">&#9675;</span> 近隣説明範囲（半径{radius_m}m）<br>
-        <span style="color:#e65100;">&#9679;</span> 看板設置箇所<br>
+        <span style="color:#e65100;">&#9673;</span> 看板設置箇所<br>
         <hr style="margin:4px 0;">
         範囲: 半径{radius_m}m
     </div>
