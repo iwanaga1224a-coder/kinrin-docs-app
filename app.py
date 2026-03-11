@@ -928,6 +928,36 @@ with tab2:
         start_date = st.text_input("着工予定日", value=_ocr_val("start_date"), placeholder="令和8年5月1日", help=_field_help("start_date"))
         end_date = st.text_input("完了予定日", value=_ocr_val("end_date"), placeholder="令和8年10月31日", help=_field_help("end_date"))
 
+        # 着工日から届出期限を逆算して注釈表示
+        if start_date and detected_ward:
+            _wc_deadline = get_ward_config(detected_ward)
+            _sp = _wc_deadline.get("sign_period", "")
+            if _sp:
+                import re as _re
+                _reiwa_m = _re.match(r"令和(\d+)年(\d+)月(\d+)日", start_date)
+                if _reiwa_m:
+                    from datetime import date, timedelta
+                    _y = int(_reiwa_m.group(1)) + 2018
+                    _m = int(_reiwa_m.group(2))
+                    _d = int(_reiwa_m.group(3))
+                    try:
+                        _start_dt = date(_y, _m, _d)
+                        _days_list = sorted(set(int(x) for x in _re.findall(r"(\d+)日前", _sp)), reverse=True)
+                        if _days_list:
+                            _deadline_lines = []
+                            for _days in _days_list:
+                                _dl = _start_dt - timedelta(days=_days)
+                                _dl_reiwa = f"令和{_dl.year - 2018}年{_dl.month}月{_dl.day}日"
+                                _deadline_lines.append(f"**{_days}日前** → {_dl_reiwa}")
+                            st.warning(
+                                f"**届出期限の目安（{detected_ward}区）**\n\n"
+                                f"着工日 {start_date} から逆算:\n\n"
+                                + "\n\n".join(_deadline_lines)
+                                + f"\n\n※ {_sp}"
+                            )
+                    except ValueError:
+                        pass
+
         st.subheader("届出者（発注者・建築主）")
         applicant_name = st.text_input("届出者 氏名", value=_ocr_val("applicant_name"), placeholder="株式会社 ○○建設　代表取締役　○○ ○○", help=_field_help("applicant_name"))
         applicant_address = st.text_input("届出者 住所", value=_ocr_val("applicant_address"), placeholder="東京都千代田区○○1-1-1", help=_field_help("applicant_address"))
