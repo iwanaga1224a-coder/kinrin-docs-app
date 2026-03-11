@@ -446,6 +446,27 @@ def _find_template_file(ward_name, keywords):
     return None
 
 
+def _remove_seal_marks(doc):
+    """文書内の「印」（押印マーク）を削除する"""
+    # 段落内
+    for p in doc.paragraphs:
+        full = "".join(r.text for r in p.runs)
+        if "印" in full:
+            cleaned = full.replace("　印", "").replace("印", "")
+            for i, run in enumerate(p.runs):
+                run.text = cleaned if i == 0 else ""
+    # テーブル内
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for p in cell.paragraphs:
+                    full = "".join(r.text for r in p.runs)
+                    if "印" in full:
+                        cleaned = full.replace("　印", "").replace("印", "")
+                        for i, run in enumerate(p.runs):
+                            run.text = cleaned if i == 0 else ""
+
+
 def _fill_docx_by_labels(template_path, config, data, output_path):
     """ラベル検索方式でWordテンプレートにデータを流し込む"""
     doc = Document(template_path)
@@ -501,6 +522,7 @@ def _fill_docx_by_labels(template_path, config, data, output_path):
             if wrote:
                 break  # 次のフィールドへ
 
+    _remove_seal_marks(doc)
     doc.save(output_path)
     return output_path
 
@@ -660,6 +682,12 @@ def _fill_xlsx_with_config(config, data, output_path):
         value = fill_data.get(field_name, "")
         if value:
             ws[cell_ref] = value
+
+    # Excelシート内の「印」を削除
+    for row in ws.iter_rows():
+        for cell in row:
+            if cell.value and isinstance(cell.value, str) and "印" in cell.value:
+                cell.value = cell.value.replace("　印", "").replace("印", "")
 
     wb.save(output_path)
     return output_path
