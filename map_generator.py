@@ -44,7 +44,7 @@ TILE_PROVIDERS = {
         "max_native_zoom": 18,
         "max_zoom": 21,
     },
-    "国土地理院（航空写真）": {
+"国土地理院（航空写真）": {
         "tiles": "https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg",
         "attr": "国土地理院",
         "max_native_zoom": 18,
@@ -59,7 +59,7 @@ TILE_PROVIDERS = {
 }
 
 
-def generate_map_html(site_name, address, lat, lng, radius_m=50, zoom_override=None, tile_name="国土地理院（標準）"):
+def generate_map_html(site_name, address, lat, lng, radius_m=50, zoom_override=None, tile_name="国土地理院（標準）", building_pins=None, sign_pins=None):
     """Foliumで近隣説明範囲図HTMLを生成し、一時ファイルパスを返す"""
     zoom = zoom_override if zoom_override else _calc_zoom(radius_m)
 
@@ -90,7 +90,7 @@ def generate_map_html(site_name, address, lat, lng, radius_m=50, zoom_override=N
             max_zoom=max_zoom,
         ).add_to(m)
 
-    # タイトル（地図上部）
+    # タイトル（地図上部 — 現場名・住所を大きく表示）
     title_html = f"""
     <div style="
         position: fixed;
@@ -99,13 +99,24 @@ def generate_map_html(site_name, address, lat, lng, radius_m=50, zoom_override=N
         z-index: 9999;
         background: white;
         border: 2px solid #333;
-        padding: 8px 20px;
-        font-size: 16px;
-        font-weight: bold;
+        padding: 14px 32px;
+        min-width: 500px;
         font-family: 'Yu Gothic', 'MS Gothic', sans-serif;
         box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
     ">
-        近隣説明範囲図　｜　{site_name}
+        <div style="font-size:14px;font-weight:bold;text-align:center;margin-bottom:10px;border-bottom:1px solid #ccc;padding-bottom:8px;">
+            近隣説明範囲図
+        </div>
+        <table style="font-size:14px;line-height:2;border-collapse:collapse;width:100%;">
+            <tr>
+                <td style="font-weight:bold;white-space:nowrap;padding-right:12px;color:#555;">【現場名】</td>
+                <td>{site_name}</td>
+            </tr>
+            <tr>
+                <td style="font-weight:bold;white-space:nowrap;padding-right:12px;color:#555;">【現場住所】</td>
+                <td><span style="color:red;">★</span> {address}</td>
+            </tr>
+        </table>
     </div>
     """
     m.get_root().html.add_child(folium.Element(title_html))
@@ -127,9 +138,8 @@ def generate_map_html(site_name, address, lat, lng, radius_m=50, zoom_override=N
         <b>凡例</b><br>
         <span style="color:red;">&#9733;</span> 工事現場<br>
         <span style="color:red;">&#9675;</span> 近隣説明範囲（半径{radius_m}m）<br>
+        <span style="color:#e65100;">&#9679;</span> 看板設置箇所<br>
         <hr style="margin:4px 0;">
-        工事名: {site_name}<br>
-        所在地: {address}<br>
         範囲: 半径{radius_m}m
     </div>
     """
@@ -158,24 +168,47 @@ def generate_map_html(site_name, address, lat, lng, radius_m=50, zoom_override=N
         ),
     ).add_to(m)
 
-    # 現場ラベル（円の外側に配置）
-    offset = _label_offset(radius_m)
-    Marker(
-        location=[lat + offset, lng],
-        icon=DivIcon(
-            html=f"""
-            <div style="
-                font-size: 11px; font-weight: bold;
-                font-family: 'Yu Gothic', 'MS Gothic', sans-serif;
-                color: #333; background: rgba(255,255,255,0.85);
-                padding: 2px 6px; border: 1px solid #999;
-                white-space: nowrap; transform: translateX(-50%);
-            ">★ 工事現場（{address}）</div>
-            """,
-            icon_size=(200, 20),
-            icon_anchor=(100, 10),
-        ),
-    ).add_to(m)
+    # ★ラベルはタイトルバーに統合済みのため地図上のラベルは不要
+
+    # 建物番号ピン
+    if building_pins:
+        for pin in building_pins:
+            no = pin["no"]
+            Marker(
+                location=[pin["lat"], pin["lng"]],
+                icon=DivIcon(
+                    html=f'<div style="'
+                         f'font-size:16px;font-weight:bold;color:white;'
+                         f'background:#1a73e8;border:3px solid white;'
+                         f'border-radius:50%;width:32px;height:32px;'
+                         f'display:flex;align-items:center;justify-content:center;'
+                         f'box-shadow:1px 1px 4px rgba(0,0,0,0.5);'
+                         f'transform:translate(-16px,-16px);'
+                         f'">{no}</div>',
+                    icon_size=(32, 32),
+                    icon_anchor=(0, 0),
+                ),
+            ).add_to(m)
+
+    # 看板設置箇所ピン
+    if sign_pins:
+        for spin in sign_pins:
+            Marker(
+                location=[spin["lat"], spin["lng"]],
+                popup="看板設置箇所",
+                icon=DivIcon(
+                    html='<div style="'
+                         'font-size:20px;font-weight:bold;color:#e65100;'
+                         'background:white;border:3px solid #e65100;'
+                         'border-radius:50%;width:32px;height:32px;'
+                         'display:flex;align-items:center;justify-content:center;'
+                         'box-shadow:1px 1px 4px rgba(0,0,0,0.5);'
+                         'transform:translate(-16px,-16px);'
+                         '">●</div>',
+                    icon_size=(32, 32),
+                    icon_anchor=(0, 0),
+                ),
+            ).add_to(m)
 
     # 一時ファイルに保存
     tmp = tempfile.NamedTemporaryFile(suffix=".html", delete=False, mode="w", encoding="utf-8")
@@ -203,9 +236,9 @@ def html_to_png(html_path, png_path, width=1200, height=900):
     return png_path
 
 
-def generate_map_png(site_name, address, lat, lng, radius_m=50, output_dir=None, zoom_override=None, tile_name="国土地理院（標準）"):
+def generate_map_png(site_name, address, lat, lng, radius_m=50, output_dir=None, zoom_override=None, tile_name="国土地理院（標準）", building_pins=None, sign_pins=None):
     """地図HTMLを生成→PNGに変換して返す"""
-    html_path = generate_map_html(site_name, address, lat, lng, radius_m, zoom_override=zoom_override, tile_name=tile_name)
+    html_path = generate_map_html(site_name, address, lat, lng, radius_m, zoom_override=zoom_override, tile_name=tile_name, building_pins=building_pins, sign_pins=sign_pins)
     if output_dir is None:
         output_dir = tempfile.gettempdir()
     png_path = os.path.join(output_dir, "近隣説明範囲図.png")

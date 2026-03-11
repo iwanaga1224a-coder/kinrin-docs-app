@@ -15,6 +15,10 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml.ns import qn
 
+from ward_config import get_ward_config
+from template_filler import fill_sign_notice as _fill_official_sign_notice
+from template_filler import fill_explanation_report as _fill_official_report
+
 
 # ========== ユーティリティ ==========
 
@@ -73,8 +77,18 @@ def _set_table_borders(table):
 
 def generate_sign_notice(data, output_path):
     """標識設置届（建築計画のお知らせ）を生成
-    東京都中高層建築物紛争予防条例 第2号様式ベース
+    公式テンプレートがある区はそちらを使用、なければ自作生成
     """
+    ward_name = data.get("ward_name", "")
+
+    # 公式テンプレートがあればそちらを使用
+    official = _fill_official_sign_notice(ward_name, data, output_path)
+    if official:
+        return official
+
+    # フォールバック: 自作Word生成
+    wc = get_ward_config(ward_name)
+
     doc = Document()
     section = doc.sections[0]
     section.page_width = Cm(21.0)
@@ -86,12 +100,12 @@ def generate_sign_notice(data, output_path):
 
     # ヘッダー
     _add_heading_paragraph(doc, "標 識 設 置 届", font_size=18)
-    _add_body_paragraph(doc, f"（東京都中高層建築物の建築に係る紛争の予防と調整に関する条例第6条の規定による届出）",
+    _add_body_paragraph(doc, f"（{wc['ordinance_name']}{wc['sign_article']}の規定による届出）",
                         font_size=9, align=WD_ALIGN_PARAGRAPH.CENTER, space_after=12)
 
     # 日付・宛先
     _add_body_paragraph(doc, f"　　　　　　　　　　　　　　　　　　　　　　　　{data.get('submit_date', '令和　年　月　日')}")
-    _add_body_paragraph(doc, f"　{data.get('ward_name', '○○')}区長　殿")
+    _add_body_paragraph(doc, f"　{ward_name}{wc['suffix']}　殿")
     _add_body_paragraph(doc, "")
 
     # 届出者情報
@@ -140,7 +154,19 @@ def generate_sign_notice(data, output_path):
 # ========== 2. 近隣説明報告書 ==========
 
 def generate_explanation_report(data, output_path):
-    """近隣説明報告書を生成"""
+    """近隣説明報告書を生成
+    公式テンプレートがある区はそちらを使用、なければ自作生成
+    """
+    ward_name = data.get("ward_name", "")
+
+    # 公式テンプレートがあればそちらを使用
+    official = _fill_official_report(ward_name, data, output_path)
+    if official:
+        return official
+
+    # フォールバック: 自作Word生成
+    wc = get_ward_config(ward_name)
+
     doc = Document()
     section = doc.sections[0]
     section.page_width = Cm(21.0)
@@ -151,10 +177,11 @@ def generate_explanation_report(data, output_path):
     section.right_margin = Cm(2.5)
 
     _add_heading_paragraph(doc, "近 隣 説 明 報 告 書", font_size=18)
-    _add_body_paragraph(doc, "", space_after=6)
+    _add_body_paragraph(doc, f"（{wc['ordinance_name']}{wc['explanation_article']}の規定による報告）",
+                        font_size=9, align=WD_ALIGN_PARAGRAPH.CENTER, space_after=6)
 
     _add_body_paragraph(doc, f"　　　　　　　　　　　　　　　　　　　　　　　　{data.get('submit_date', '令和　年　月　日')}")
-    _add_body_paragraph(doc, f"　{data.get('ward_name', '○○')}区長　殿")
+    _add_body_paragraph(doc, f"　{ward_name}{wc['suffix']}　殿")
     _add_body_paragraph(doc, "")
     _add_body_paragraph(doc, f"　報告者　住所　{data.get('applicant_address', '')}")
     _add_body_paragraph(doc, f"　　　　　氏名　{data.get('applicant_name', '')}　　　　　　印")
@@ -308,8 +335,8 @@ def generate_construction_notice(data, output_path):
 
 # ========== 4. 近隣説明範囲図（Word版） ==========
 
-def generate_map_document(data, map_png_path, output_path):
-    """近隣説明範囲図をWord文書として生成（地図画像埋め込み）"""
+def generate_map_document(data, map_png_path, output_path, building_pins=None):
+    """近隣説明範囲図をWord文書として生成（地図画像埋め込み + 建物リスト）"""
     doc = Document()
     section = doc.sections[0]
     section.page_width = Cm(29.7)  # A4横
@@ -345,6 +372,32 @@ def generate_map_document(data, map_png_path, output_path):
         _set_cell(table.cell(i, 1), value, font_size=10)
         table.cell(i, 0).width = Cm(3.5)
         table.cell(i, 1).width = Cm(22.0)
+
+    # 建物番号リスト（ピンがある場合は必ず出力、ラベル空欄でもOK）
+    if building_pins:
+        _add_body_paragraph(doc, "", space_after=4)
+        _add_body_paragraph(doc, "近隣建物一覧", font_size=12, bold=True, space_after=6)
+
+        bld_table = doc.add_table(rows=len(building_pins) + 1, cols=3)
+        bld_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        _set_table_borders(bld_table)
+
+        # ヘッダー行
+        _set_cell(bld_table.cell(0, 0), "番号", font_size=10, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
+        _set_cell(bld_table.cell(0, 1), "建物名称・用途", font_size=10, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
+        _set_cell(bld_table.cell(0, 2), "備考", font_size=10, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
+        bld_table.cell(0, 0).width = Cm(2.0)
+        bld_table.cell(0, 1).width = Cm(12.0)
+        bld_table.cell(0, 2).width = Cm(11.5)
+
+        for i, pin in enumerate(building_pins):
+            row_idx = i + 1
+            _set_cell(bld_table.cell(row_idx, 0), str(pin["no"]), font_size=10, align=WD_ALIGN_PARAGRAPH.CENTER)
+            _set_cell(bld_table.cell(row_idx, 1), pin.get("label", ""), font_size=10)
+            _set_cell(bld_table.cell(row_idx, 2), "", font_size=10)
+            bld_table.cell(row_idx, 0).width = Cm(2.0)
+            bld_table.cell(row_idx, 1).width = Cm(12.0)
+            bld_table.cell(row_idx, 2).width = Cm(11.5)
 
     doc.save(output_path)
     return output_path

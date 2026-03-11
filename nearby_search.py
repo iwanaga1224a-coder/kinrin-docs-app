@@ -147,6 +147,70 @@ def search_nearby(lat, lng, radius_m):
     return classified
 
 
+def search_nearby_with_coords(lat, lng, radius_m):
+    """範囲内の建物・施設を座標付きで取得（地図マッピング用）
+
+    Returns:
+        list: [
+            {"no": 1, "lat": ..., "lng": ..., "name": "...", "category": "...", "address": "..."},
+            ...
+        ]
+    """
+    result = _query_overpass(lat, lng, radius_m)
+    if not result or "elements" not in result:
+        return []
+
+    buildings = []
+    seen = set()
+
+    for elem in result["elements"]:
+        tags = elem.get("tags", {})
+        if not tags:
+            continue
+
+        # 座標を取得（nodeは直接、wayはcenter）
+        if elem["type"] == "node":
+            e_lat = elem.get("lat")
+            e_lng = elem.get("lon")
+        elif elem["type"] == "way" and "center" in elem:
+            e_lat = elem["center"].get("lat")
+            e_lng = elem["center"].get("lon")
+        else:
+            continue
+
+        if e_lat is None or e_lng is None:
+            continue
+
+        # 重複排除
+        dedup_key = f"{elem.get('id', '')}"
+        if dedup_key in seen:
+            continue
+        seen.add(dedup_key)
+
+        name = tags.get("name", "")
+        addr = tags.get("addr:full", "") or tags.get("addr:street", "")
+        housenumber = tags.get("addr:housenumber", "")
+        if housenumber and addr:
+            addr = f"{addr} {housenumber}"
+
+        category = _classify(tags)
+
+        buildings.append({
+            "lat": e_lat,
+            "lng": e_lng,
+            "name": name,
+            "category": category,
+            "address": addr,
+        })
+
+    # 番号を振る（北→南、西→東の順でソート）
+    buildings.sort(key=lambda b: (-b["lat"], b["lng"]))
+    for i, b in enumerate(buildings):
+        b["no"] = i + 1
+
+    return buildings
+
+
 def format_nearby_list(classified):
     """分類済みデータを見やすいテキストリストに変換"""
     if not classified:
