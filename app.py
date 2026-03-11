@@ -358,14 +358,24 @@ if site_address:
 # ========== STEP 2：届出ルール ==========
 st.markdown('<div class="step-header"><div class="step-number">2</div><div class="step-title">届出ルールの確認</div></div>', unsafe_allow_html=True)
 
-st.info(
-    "近隣説明の範囲・届出先の部署は**区ごとに異なります**。\n\n"
-    "- 半径○mの円で指定する区\n"
-    "- 建物高さを敷地境界から倒した範囲で指定する区\n"
-    "- 高さ10m超で中高層条例が適用される区\n\n"
-    "各区の建築課・環境対策課等の窓口で最新のルール・ひな形をご確認ください。\n"
-    "ここでは範囲を手動で設定できます。"
-)
+if is_demolition:
+    st.info(
+        "解体工事の事前周知の範囲・届出先は**自治体ごとに異なります**。\n\n"
+        "- 独自の解体事前周知要綱がある区（23区はほぼ全区）\n"
+        "- 建設リサイクル法の届出のみの市（多摩地域の多く）\n"
+        "- 延べ面積80m²以上で届出が必要な区が多い\n\n"
+        "各自治体の建築課・環境対策課等の窓口で最新のルール・ひな形をご確認ください。\n"
+        "ここでは範囲を手動で設定できます。"
+    )
+else:
+    st.info(
+        "近隣説明の範囲・届出先の部署は**区ごとに異なります**。\n\n"
+        "- 半径○mの円で指定する区\n"
+        "- 建物高さを敷地境界から倒した範囲で指定する区\n"
+        "- 高さ10m超で中高層条例が適用される区\n\n"
+        "各区の建築課・環境対策課等の窓口で最新のルール・ひな形をご確認ください。\n"
+        "ここでは範囲を手動で設定できます。"
+    )
 
 # 区別の参照URL表示（工事種別に応じて切替）
 if detected_ward:
@@ -393,32 +403,62 @@ if detected_ward:
     _guide = get_procedure_guide(detected_ward)
     _ward_sfx = detected_ward_full if "detected_ward_full" in dir() else detected_ward
 
-    with st.expander(f"📋 {_ward_sfx} 手続きガイド — 必要な書類・手続きの流れ", expanded=False):
-        # 手続きステップ
-        st.markdown("### 手続きの流れ")
-        for step in _guide["steps"]:
-            st.markdown(f"**{step['order']}. {step['title']}**  \n{step['detail']}")
+    _display_url = _wc_for_url.get("demolition_url", "") if is_demolition else _guide.get("regulation_url", "")
+    _expander_title = f"📋 {_ward_sfx} 手続きガイド — {'解体工事の届出' if is_demolition else '必要な書類・手続きの流れ'}"
+    with st.expander(_expander_title, expanded=False):
+        if is_demolition:
+            # === 解体モード用の手続きガイド ===
+            _demo_cfg = _wc_for_url.get("demolition", {})
+            st.markdown("### 解体工事の手続きの流れ")
+            _demo_steps = [
+                ("対象確認", f"解体工事が事前周知の対象か確認（{_demo_cfg.get('form_note', '各区の要綱を確認')}）"),
+                ("標識（看板）の設置", "解体工事のお知らせ看板を現場に設置（区の公式様式を使用）"),
+                ("近隣住民への事前周知", "説明範囲内の住民に個別訪問・説明会・書面配付等で周知"),
+                ("事前周知報告書の提出", f"{_ward_sfx}に報告書を提出（案内図・チラシ等を添付）"),
+                ("建設リサイクル法届出", "延べ面積80m²以上の場合、着手7日前までに届出"),
+                ("解体工事着手", "上記手続き完了後、工事着手"),
+            ]
+            for i, (title, detail) in enumerate(_demo_steps, 1):
+                st.markdown(f"**{i}. {title}**  \n{detail}")
+
+            st.markdown("---")
+
+            st.markdown("### 必要書類・準備物")
+            _demo_docs = [
+                ("✅", "【必須】", "事前周知報告書", "本アプリで生成可能"),
+                ("✅", "【必須】", "解体工事のお知らせ看板", "区の公式様式をDL（本アプリでは生成しません）"),
+                ("✅", "【必須】", "近隣説明範囲図（案内図）", "本アプリで生成可能"),
+                ("✅", "【必須】", "工事のお知らせ（近隣配布チラシ）", "本アプリで生成可能"),
+                ("📎", "【任意】", "工事対象建物の写真", "遠景・近景（添付推奨）"),
+                ("📎", "【該当時】", "建設リサイクル法届出書", "延べ80m²以上の場合（別途作成）"),
+            ]
+            for icon, req, name, how in _demo_docs:
+                st.markdown(f"{icon} {req} **{name}**  \n　{how}")
+        else:
+            # === 新築モード用の手続きガイド ===
+            st.markdown("### 手続きの流れ")
+            for step in _guide["steps"]:
+                st.markdown(f"**{step['order']}. {step['title']}**  \n{step['detail']}")
+
+            st.markdown("---")
+
+            st.markdown("### 必要書類・準備物")
+            for doc in _guide["documents"]:
+                icon = "✅" if doc["required"] else "📎"
+                req_label = "【必須】" if doc["required"] else "【任意】"
+                st.markdown(f"{icon} {req_label} **{doc['name']}**  \n　{doc['how']}")
 
         st.markdown("---")
 
-        # 必要書類リスト
-        st.markdown("### 必要書類・準備物")
-        for doc in _guide["documents"]:
-            icon = "✅" if doc["required"] else "📎"
-            req_label = "【必須】" if doc["required"] else "【任意】"
-            st.markdown(f"{icon} {req_label} **{doc['name']}**  \n　{doc['how']}")
-
-        st.markdown("---")
-
-        # 標識（看板）の設置要件
-        st.markdown("### 標識（看板）の設置要件")
+        # 標識（看板）の設置要件（共通）
+        st.markdown(f"### {'解体工事お知らせ看板' if is_demolition else '標識（看板）'}の設置要件")
         sr = _guide["sign_requirements"]
         st.markdown(f"- **設置場所**: {sr['location']}")
         st.markdown(f"- **設置時期**: {sr['timing']}")
-        st.markdown(f"- **記載事項**: {sr['content']}")
+        if not is_demolition:
+            st.markdown(f"- **記載事項**: {sr['content']}")
         st.info(f"💡 {sr['note']}")
-        st.caption("⚠️ 看板の実物（現場掲示用）はこのツールでは生成しません。区の公式サイトから様式をダウンロードして作成してください。")
-        _display_url = _wc_for_url.get("demolition_url", "") if is_demolition else _guide.get("regulation_url", "")
+        st.caption("⚠️ 看板の実物（現場掲示用）はこのツールでは生成しません。公式サイトから様式をダウンロードして作成してください。")
         if _display_url:
             st.caption(f"　→ 公式ページ: {_display_url}")
 
@@ -426,7 +466,7 @@ if detected_ward:
 
         # 注意点
         if _guide["tips"]:
-            st.markdown("### この区の注意点")
+            st.markdown(f"### {'この自治体' if is_demolition else 'この区'}の注意点")
             for tip in _guide["tips"]:
                 st.warning(tip)
 
