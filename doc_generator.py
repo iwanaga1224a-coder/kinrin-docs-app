@@ -151,6 +151,83 @@ def generate_sign_notice(data, output_path):
     return output_path
 
 
+# ========== 1a. 解体工事のお知らせ標識（足立区 第1号様式準拠） ==========
+
+def generate_demolition_sign(data, output_path):
+    """解体工事のお知らせ標識を生成（足立区 別記第1号様式準拠）
+    A3版以上の看板に記載する内容をWord文書として出力する。
+    """
+    ward_name = data.get("ward_name", "")
+    wc = get_ward_config(ward_name)
+    demo_cfg = wc.get("demolition", {})
+
+    doc = Document()
+    section = doc.sections[0]
+    # A3横を想定（ただしWordとしてはA4縦で出力し、印刷時に拡大を案内）
+    section.page_width = Cm(29.7)
+    section.page_height = Cm(42.0)
+    section.top_margin = Cm(2.0)
+    section.bottom_margin = Cm(2.0)
+    section.left_margin = Cm(2.5)
+    section.right_margin = Cm(2.5)
+
+    # 様式番号
+    _add_body_paragraph(doc, f"別記第1号様式（{demo_cfg.get('ordinance_name', '建築物の解体工事の事前周知に関する要綱')}第7条関係）",
+                        font_size=8, space_after=6)
+
+    # タイトル
+    _add_heading_paragraph(doc, "解 体 工 事 の お 知 ら せ", font_size=22)
+    _add_body_paragraph(doc, "", space_after=8)
+
+    # メインテーブル
+    rows_data = [
+        ("解体建築物の所在地", data.get("site_address", "")),
+        ("解体建築物の規模", f"延べ面積 {data.get('total_floor_area', '')} ㎡　　"
+                          f"地上 {data.get('floors_above', '')} 階　地下 {data.get('floors_below', '')} 階"),
+        ("構　　造", data.get("structure", "")),
+        ("高　　さ", f"{data.get('height', '')} m"),
+        ("工 事 期 間", f"{data.get('start_date', '')} から {data.get('end_date', '')} まで"),
+        ("解 体 方 法", data.get("demolition_method", "")),
+        ("作 業 時 間", data.get("work_hours", "午前8時00分 ～ 午後5時00分")),
+        ("発注者　氏　名", data.get("applicant_name", "")),
+        ("　　　　住　所", data.get("applicant_address", "")),
+        ("　　　　連絡先", data.get("applicant_tel", "")),
+        ("工事業者　氏　名", data.get("constructor_name", "")),
+        ("　　　　　住　所", data.get("constructor_address", "")),
+        ("　　　　　連絡先", data.get("constructor_tel", "")),
+        ("石綿等の使用の有無", data.get("asbestos_status", "□ 有り　□ 無し　□ 調査中")),
+        ("石綿等の除去方法", data.get("asbestos_removal_method", "")),
+        ("安全対策・公害防止対策", data.get("safety_measures",
+            "・仮囲い・防音パネルの設置\n・散水による粉塵防止\n・交通誘導員の配置")),
+        ("搬出経路", data.get("transport_route", "")),
+        ("工事車両通行経路", data.get("vehicle_route", "")),
+    ]
+
+    table = doc.add_table(rows=len(rows_data), cols=2)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    _set_table_borders(table)
+
+    for i, (label, value) in enumerate(rows_data):
+        _set_cell(table.cell(i, 0), label, font_size=12, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
+        _set_cell(table.cell(i, 1), value, font_size=12)
+        table.cell(i, 0).width = Cm(6.0)
+        table.cell(i, 1).width = Cm(18.0)
+
+    _add_body_paragraph(doc, "", space_after=8)
+
+    # 注意書き
+    _add_body_paragraph(doc, "※ この標識は、足立区建築物の解体工事の事前周知に関する要綱第7条の規定に基づき設置するものです。",
+                        font_size=9, space_after=4)
+    _add_body_paragraph(doc, "※ A3版以上の大きさで作成し、建築敷地の道路に接する部分に、"
+                        "地面から標識の下端までおおむね1メートルの高さに設置してください。",
+                        font_size=9, space_after=4)
+    _add_body_paragraph(doc, f"問い合わせ先: {demo_cfg.get('submit_to', '建築審査課')}",
+                        font_size=9, space_after=2)
+
+    doc.save(output_path)
+    return output_path
+
+
 # ========== 1b. 解体工事事前周知報告書 ==========
 
 def _merge_cells_and_set(table, row1, col1, row2, col2, text, font_size=10, bold=False, align=WD_ALIGN_PARAGRAPH.LEFT):
@@ -198,7 +275,8 @@ def generate_demolition_report(data, output_path):
                         font_size=8, align=WD_ALIGN_PARAGRAPH.RIGHT, space_after=8)
 
     # --- 要綱文 ---
-    _ordinance_ref = wc.get("demolition", {}).get("ordinance_name", "")
+    _demo_cfg = wc.get("demolition", {})
+    _ordinance_ref = _demo_cfg.get("ordinance_name", "")
     if not _ordinance_ref:
         _ordinance_ref = f"{ward_name}{suffix}建築物等の解体等工事に係る計画の事前周知に関する要綱"
     _add_body_paragraph(doc,
@@ -320,8 +398,48 @@ def generate_demolition_report(data, output_path):
 
     _add_body_paragraph(doc, "", space_after=4)
 
+    # --- 標識設置報告（足立区等で必要） ---
+    if data.get("sign_install_date"):
+        _add_body_paragraph(doc, "【標識設置の報告】", font_size=10, bold=True, space_after=4)
+        sign_rows = [
+            ("標識設置日", data.get("sign_install_date", "")),
+            ("標識設置場所", data.get("sign_location", "建築敷地の道路に面する見やすい場所")),
+        ]
+        tbl_sign = doc.add_table(rows=len(sign_rows), cols=2)
+        tbl_sign.alignment = WD_TABLE_ALIGNMENT.CENTER
+        _set_table_borders(tbl_sign)
+        for i, (label, value) in enumerate(sign_rows):
+            _set_cell(tbl_sign.cell(i, 0), label, font_size=9, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
+            _set_cell(tbl_sign.cell(i, 1), value, font_size=10)
+            tbl_sign.cell(i, 0).width = Cm(4.0)
+            tbl_sign.cell(i, 1).width = Cm(13.0)
+        _add_body_paragraph(doc, "※ 標識設置状況の写真を別紙に添付してください。", font_size=8, space_after=6)
+
+    # --- 石綿等の調査結果（足立区の要綱第6条で事前調査が必要） ---
+    _asbestos = data.get("asbestos_status", "")
+    if _asbestos:
+        _add_body_paragraph(doc, "【石綿等の調査結果】", font_size=10, bold=True, space_after=4)
+        asbestos_rows = [
+            ("石綿等の使用の有無", _asbestos),
+            ("石綿等の除去方法", data.get("asbestos_removal_method", "該当なし")),
+        ]
+        tbl_asb = doc.add_table(rows=len(asbestos_rows), cols=2)
+        tbl_asb.alignment = WD_TABLE_ALIGNMENT.CENTER
+        _set_table_borders(tbl_asb)
+        for i, (label, value) in enumerate(asbestos_rows):
+            _set_cell(tbl_asb.cell(i, 0), label, font_size=9, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
+            _set_cell(tbl_asb.cell(i, 1), value, font_size=10)
+            tbl_asb.cell(i, 0).width = Cm(4.0)
+            tbl_asb.cell(i, 1).width = Cm(13.0)
+        _add_body_paragraph(doc, "", space_after=4)
+
     # --- 備考 ---
-    _add_body_paragraph(doc, "備考：提出部数　2部（副本の返却が必要なければ1部で可）", font_size=8, space_after=2)
+    _submit_copies = _demo_cfg.get("submit_copies", 2) if _demo_cfg else 2
+    _submit_to = _demo_cfg.get("submit_to", "") if _demo_cfg else ""
+    _note_parts = [f"提出部数　{_submit_copies}部"]
+    if _submit_to:
+        _note_parts.append(f"提出先: {_submit_to}")
+    _add_body_paragraph(doc, f"備考：{'／'.join(_note_parts)}", font_size=8, space_after=2)
 
     doc.save(output_path)
     return output_path

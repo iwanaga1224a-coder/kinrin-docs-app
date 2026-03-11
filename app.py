@@ -25,6 +25,7 @@ from doc_generator import (
     generate_sign_notice,
     generate_explanation_report,
     generate_demolition_report,
+    generate_demolition_sign,
     generate_construction_notice,
     generate_map_document,
 )
@@ -338,13 +339,19 @@ if site_address:
             _target = _demo_cfg.get("target_area", 80)
             _note = _demo_cfg.get("form_note", "")
             _target_str = "全ての建物" if _target == 0 else f"延べ面積{_target}m²以上"
+            _ordinance = _demo_cfg.get("ordinance_name", "")
+            _scope = _demo_cfg.get("scope_rule", "")
+            _large = _demo_cfg.get("large_building_criteria", "")
             st.markdown(f"""
 **🔧 解体工事の届出ルール（{detected_ward_full}）**
+{f'- 根拠: {_ordinance}' if _ordinance else ''}
 - 対象: {_target_str}
-- 掲示期限: 木造 **{_deadline_w}日前** ／ 非木造 **{_deadline_o}日前**
+- 標識設置期限: その他 **{_deadline_w}日前** ／ 大規模 **{_deadline_o}日前**
+{f'- 大規模建築物等: {_large}' if _large else ''}
+{f'- 説明範囲: {_scope}' if _scope else ''}
 - {_note}
 """)
-            st.caption("⚠️ 解体工事の「お知らせ看板」は新築とは別様式です。区の公式サイトから様式をDLしてください。")
+            st.caption("⚠️ 解体工事のお知らせ標識は本アプリで生成可能です。印刷時にA3以上に拡大してください。")
         else:
             if tpl_avail["sign_notice"]:
                 st.caption(f"様式: {detected_ward_full}の公式様式を使用（{tpl_avail['sign_notice'].upper()}形式）")
@@ -426,7 +433,7 @@ if detected_ward:
             st.markdown("### 必要書類・準備物")
             _demo_docs = [
                 ("✅", "【必須】", "事前周知報告書", "本アプリで生成可能"),
-                ("✅", "【必須】", "解体工事のお知らせ看板", "区の公式様式をDL（本アプリでは生成しません）"),
+                ("✅", "【必須】", "解体工事のお知らせ標識", "本アプリで生成可能（A3以上に拡大して掲示）"),
                 ("✅", "【必須】", "近隣説明範囲図（案内図）", "本アプリで生成可能"),
                 ("✅", "【必須】", "工事のお知らせ（近隣配布チラシ）", "本アプリで生成可能"),
                 ("📎", "【任意】", "工事対象建物の写真", "遠景・近景（添付推奨）"),
@@ -996,6 +1003,46 @@ with tab1:
             if _show("other_zone"):
                 other_zone = st.text_input("その他の地域・地区", placeholder="第3種高度地区")
 
+    # 解体工事専用フィールド（解体モード時のみ表示）
+    if is_demolition:
+        st.markdown("**解体工事の詳細**")
+        col_demo1, col_demo2 = st.columns(2)
+        with col_demo1:
+            construction_year = st.text_input("竣工年又は築年数", placeholder="昭和55年（築45年）",
+                                              help="報告書の「解体建築物等の概要」に記載")
+            renovation_history = st.text_input("増改築・改修歴", value="無", placeholder="平成10年 外壁改修",
+                                               help="報告書に記載")
+            demolition_method = st.selectbox("解体方法", [
+                "圧砕機による機械解体",
+                "手壊し解体（手作業）",
+                "カッター工法",
+                "転倒工法",
+                "その他",
+            ], help="標識（お知らせ看板）に記載")
+        with col_demo2:
+            asbestos_status = st.selectbox("石綿等の使用", [
+                "無し",
+                "有り",
+                "調査中",
+            ], help="標識・報告書に記載（要綱第6条: 事前調査が必要）")
+            asbestos_removal_method = ""
+            if asbestos_status == "有り":
+                asbestos_removal_method = st.text_input("石綿等の除去方法",
+                    placeholder="隔離養生の上、湿潤化して手作業で除去",
+                    help="石綿ありの場合に標識・報告書に記載")
+            transport_route = st.text_input("搬出経路", placeholder="現場北側より○○通りへ搬出",
+                                            help="標識に記載")
+            vehicle_route = st.text_input("工事車両通行経路", placeholder="○○通り→△△交差点→□□通り",
+                                          help="標識に記載")
+    else:
+        construction_year = ""
+        renovation_history = ""
+        demolition_method = ""
+        asbestos_status = ""
+        asbestos_removal_method = ""
+        transport_route = ""
+        vehicle_route = ""
+
     # 戸数（区の様式で必要な場合のみ表示）
     if _show("unit_count") or _show("oneroom_count"):
         col_unit1, col_unit2 = st.columns(2)
@@ -1237,6 +1284,18 @@ if st.button("書類を一括生成", type="primary", use_container_width=True):
         "explained_count": explained_count or "",
         "unexplained_count": unexplained_count or "",
         "opinions": opinions or "特になし",
+        # 解体専用フィールド
+        "construction_year": construction_year or "",
+        "renovation_history": renovation_history or "無",
+        "demolition_method": demolition_method or "",
+        "asbestos_status": asbestos_status or "",
+        "asbestos_removal_method": asbestos_removal_method or "",
+        "transport_route": transport_route or "",
+        "vehicle_route": vehicle_route or "",
+        "constructor_address": "",  # 施工者住所（将来フォーム追加可）
+        "subcontractor_name": "",
+        "subcontractor_address": "",
+        "subcontractor_tel": "",
     }
 
     with st.spinner("書類を生成中..."):
@@ -1264,14 +1323,17 @@ if st.button("書類を一括生成", type="primary", use_container_width=True):
             generate_map_document(data, map_png, map_docx, building_pins=st.session_state.get("building_pins", []))
             progress.progress(25, text="標識設置届を生成中...")
 
-            # 2. 標識設置届 or 解体事前周知報告書
+            # 2. 標識設置届 or 解体書類
             from template_filler import get_available_templates
             tpl = get_available_templates(ward)
             sign_path = None
             demolition_report_path = None
+            demolition_sign_path = None
             if is_demolition:
-                # 解体: 事前周知報告書を生成
-                demolition_report_path = os.path.join(tmpdir, "02_解体工事事前周知報告書.docx")
+                # 解体: お知らせ標識 + 事前周知報告書を生成
+                demolition_sign_path = os.path.join(tmpdir, "02_解体工事のお知らせ標識.docx")
+                generate_demolition_sign(data, demolition_sign_path)
+                demolition_report_path = os.path.join(tmpdir, "03_解体工事事前周知報告書.docx")
                 generate_demolition_report(data, demolition_report_path)
             else:
                 sign_ext = ".xlsx" if tpl["sign_notice"] == "xlsx" else ".docx"
@@ -1313,7 +1375,8 @@ if st.button("書類を一括生成", type="primary", use_container_width=True):
                 "近隣説明範囲図.png",
             ]
             if is_demolition:
-                _zip_files.insert(1, "02_解体工事事前周知報告書.docx")
+                _zip_files.insert(1, "02_解体工事のお知らせ標識.docx")
+                _zip_files.insert(2, "03_解体工事事前周知報告書.docx")
             else:
                 sign_ext = ".xlsx" if tpl["sign_notice"] == "xlsx" else ".docx"
                 _zip_files.insert(1, f"02_標識設置届{sign_ext}")
@@ -1328,12 +1391,12 @@ if st.button("書類を一括生成", type="primary", use_container_width=True):
             zip_buffer.seek(0)
 
             if is_demolition:
-                st.success("解体工事用の書類を生成しました！")
+                st.success("解体工事用の書類を生成しました！（お知らせ標識 + 事前周知報告書 + 範囲図 + チラシ）")
                 _demo_url = _wc_for_url.get("demolition_url", "") if "_wc_for_url" in dir() else ""
                 if _demo_url:
                     st.info(
-                        f"**解体工事の「お知らせ看板」様式は自治体ごとに異なります。**\n\n"
-                        f"公式サイトから看板様式をダウンロードしてください。"
+                        f"**お知らせ標識はA3以上に拡大して印刷してください。**\n\n"
+                        f"公式サイトで最新の様式・記載要件を確認することをおすすめします。"
                         f"\n\n🔗 [{_demo_url}]({_demo_url})"
                     )
                 else:
@@ -1357,10 +1420,11 @@ if st.button("書類を一括生成", type="primary", use_container_width=True):
 
             with st.expander("📋 生成した書類の一覧", expanded=True):
                 if is_demolition:
-                    col1, col2, col3 = st.columns(3)
+                    col1, col2, col3, col4 = st.columns(4)
                     col1.metric("近隣説明範囲図", "01_.docx")
-                    col2.metric("事前周知報告書", "02_.docx")
-                    col3.metric("工事のお知らせ", "04_.docx")
+                    col2.metric("お知らせ標識", "02_.docx")
+                    col3.metric("事前周知報告書", "03_.docx")
+                    col4.metric("工事のお知らせ", "04_.docx")
                 else:
                     col1, col2, col3, col4 = st.columns(4)
                     col1.metric("近隣説明範囲図", "01_.docx")
