@@ -11,6 +11,7 @@ import folium
 from folium import Circle, Marker, DivIcon
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 
 
 def _calc_zoom(radius_m, zoom_offset=0):
@@ -223,10 +224,22 @@ def html_to_png(html_path, png_path, width=1200, height=900):
     options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
     options.add_argument(f"--window-size={width},{height}")
     options.add_argument("--hide-scrollbars")
 
-    driver = webdriver.Chrome(options=options)
+    # Streamlit Cloud: chromiumのパスを自動検出
+    import shutil
+    chromium_path = shutil.which("chromium") or shutil.which("chromium-browser")
+    if chromium_path:
+        options.binary_location = chromium_path
+
+    chromedriver_path = shutil.which("chromedriver")
+    if chromedriver_path:
+        service = Service(executable_path=chromedriver_path)
+        driver = webdriver.Chrome(service=service, options=options)
+    else:
+        driver = webdriver.Chrome(options=options)
     try:
         driver.get(f"file:///{html_path.replace(os.sep, '/')}")
         time.sleep(3)
