@@ -366,12 +366,18 @@ st.info(
     "ここでは範囲を手動で設定できます。"
 )
 
-# 区別の参照URL表示
+# 区別の参照URL表示（工事種別に応じて切替）
 if detected_ward:
     from ward_config import get_ward_config as _gwc
     _wc_for_url = _gwc(detected_ward)
-    if _wc_for_url.get("regulation_url"):
-        detected_ward_suffix = detected_ward_full if "detected_ward_full" in dir() else detected_ward
+    detected_ward_suffix = detected_ward_full if "detected_ward_full" in dir() else detected_ward
+    if is_demolition and _wc_for_url.get("demolition_url"):
+        st.markdown(
+            f"📎 **{detected_ward_suffix}の解体工事 事前周知・届出ページ**: "
+            f"[{_wc_for_url['demolition_url']}]({_wc_for_url['demolition_url']})"
+        )
+        st.caption("※ URLは変更される場合があります。リンク切れの際は「○○区 解体工事 事前周知 届出」等で検索してください。")
+    elif not is_demolition and _wc_for_url.get("regulation_url"):
         st.markdown(
             f"📎 **{detected_ward_suffix}の中高層条例・届出様式ページ**: "
             f"[{_wc_for_url['regulation_url']}]({_wc_for_url['regulation_url']})"
@@ -409,8 +415,9 @@ if detected_ward:
         st.markdown(f"- **記載事項**: {sr['content']}")
         st.info(f"💡 {sr['note']}")
         st.caption("⚠️ 看板の実物（現場掲示用）はこのツールでは生成しません。区の公式サイトから様式をダウンロードして作成してください。")
-        if _guide.get("regulation_url"):
-            st.caption(f"　→ 公式ページ: {_guide['regulation_url']}")
+        _display_url = _wc_for_url.get("demolition_url", "") if is_demolition else _guide.get("regulation_url", "")
+        if _display_url:
+            st.caption(f"　→ 公式ページ: {_display_url}")
 
         st.markdown("---")
 
@@ -421,8 +428,8 @@ if detected_ward:
                 st.warning(tip)
 
         # 参考URL
-        if _guide["regulation_url"]:
-            st.markdown(f"🔗 **公式ページ**: [{_guide['regulation_url']}]({_guide['regulation_url']})")
+        if _display_url:
+            st.markdown(f"🔗 **公式ページ**: [{_display_url}]({_display_url})")
 
         # メモ帳出力ボタン
         _memo_lines = []
@@ -450,10 +457,10 @@ if detected_ward:
         _memo_lines.append("【注意点】")
         for tip in _guide["tips"]:
             _memo_lines.append(f"  ・{tip}")
-        if _guide["regulation_url"]:
+        if _display_url:
             _memo_lines.append("")
             _memo_lines.append(f"【参考URL】")
-            _memo_lines.append(f"  {_guide['regulation_url']}")
+            _memo_lines.append(f"  {_display_url}")
         _memo_lines.append("")
         _memo_lines.append("※ 本ガイドはAIが条例情報から自動生成した参考情報です。")
         _memo_lines.append("  届出前に必ず管轄窓口で最新の様式・要件をご確認ください。")
