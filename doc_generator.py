@@ -108,10 +108,10 @@ def generate_sign_notice(data, output_path):
     _add_body_paragraph(doc, f"　{ward_name}{wc['suffix']}　殿")
     _add_body_paragraph(doc, "")
 
-    # 届出者情報
-    _add_body_paragraph(doc, f"　届出者　住所　{data.get('applicant_address', '')}")
-    _add_body_paragraph(doc, f"　　　　　氏名　{data.get('applicant_name', '')}　　　　　　印")
-    _add_body_paragraph(doc, f"　　　　　電話　{data.get('applicant_tel', '')}")
+    # 届出者情報（右寄せ）
+    _add_body_paragraph(doc, f"届出者　住所　{data.get('applicant_address', '')}", align=WD_ALIGN_PARAGRAPH.RIGHT)
+    _add_body_paragraph(doc, f"氏名　{data.get('applicant_name', '')}", align=WD_ALIGN_PARAGRAPH.RIGHT)
+    _add_body_paragraph(doc, f"電話　{data.get('applicant_tel', '')}", align=WD_ALIGN_PARAGRAPH.RIGHT)
     _add_body_paragraph(doc, "")
     _add_body_paragraph(doc, "　下記のとおり標識を設置しましたので届け出ます。", space_after=12)
 
@@ -183,9 +183,10 @@ def generate_explanation_report(data, output_path):
     _add_body_paragraph(doc, f"　　　　　　　　　　　　　　　　　　　　　　　　{data.get('submit_date', '令和　年　月　日')}")
     _add_body_paragraph(doc, f"　{ward_name}{wc['suffix']}　殿")
     _add_body_paragraph(doc, "")
-    _add_body_paragraph(doc, f"　報告者　住所　{data.get('applicant_address', '')}")
-    _add_body_paragraph(doc, f"　　　　　氏名　{data.get('applicant_name', '')}　　　　　　印")
-    _add_body_paragraph(doc, f"　　　　　電話　{data.get('applicant_tel', '')}")
+    # 報告者情報（右寄せ）
+    _add_body_paragraph(doc, f"報告者　住所　{data.get('applicant_address', '')}", align=WD_ALIGN_PARAGRAPH.RIGHT)
+    _add_body_paragraph(doc, f"氏名　{data.get('applicant_name', '')}", align=WD_ALIGN_PARAGRAPH.RIGHT)
+    _add_body_paragraph(doc, f"電話　{data.get('applicant_tel', '')}", align=WD_ALIGN_PARAGRAPH.RIGHT)
     _add_body_paragraph(doc, "")
     _add_body_paragraph(doc, "　下記建築計画について、近隣関係住民に対し説明を行いましたので報告します。", space_after=12)
 
@@ -234,10 +235,13 @@ def generate_explanation_report(data, output_path):
 
     _add_body_paragraph(doc, "", space_after=6)
 
-    # 住民からの意見・要望
+    # 住民からの意見・要望（長文は改行ごとに段落分割しページ送り対応）
     _add_body_paragraph(doc, "３．近隣関係住民からの意見・要望とその対応", bold=True, space_after=6)
     opinions = data.get("opinions", "特になし")
-    _add_body_paragraph(doc, f"　{opinions}", space_after=12)
+    opinion_lines = opinions.split("\n") if "\n" in opinions else [opinions]
+    for idx, line in enumerate(opinion_lines):
+        sa = 12 if idx == len(opinion_lines) - 1 else 2
+        _add_body_paragraph(doc, f"　{line}", space_after=sa)
 
     # 添付書類
     _add_body_paragraph(doc, "添付書類", bold=True, font_size=9)
@@ -266,7 +270,7 @@ def generate_construction_notice(data, output_path):
 
     _add_body_paragraph(doc, "近隣の皆様へ", font_size=12, bold=True, space_after=12)
 
-    # 挨拶文
+    # 挨拶文（改行ごとに段落分割しページ送り対応）
     greeting = data.get("greeting_text",
         "平素は格別のご理解を賜り、厚く御礼申し上げます。\n"
         "このたび、下記のとおり工事を実施させていただくこととなりました。\n"
@@ -274,7 +278,10 @@ def generate_construction_notice(data, output_path):
         "安全管理には十分注意して施工いたしますので、何卒ご理解ご協力のほど\n"
         "よろしくお願い申し上げます。"
     )
-    _add_body_paragraph(doc, greeting, font_size=10.5, space_after=16)
+    greeting_lines = greeting.split("\n") if "\n" in greeting else [greeting]
+    for idx, line in enumerate(greeting_lines):
+        sa = 16 if idx == len(greeting_lines) - 1 else 2
+        _add_body_paragraph(doc, line, font_size=10.5, space_after=sa)
 
     _add_body_paragraph(doc, "記", font_size=12, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER, space_after=12)
 
@@ -314,7 +321,10 @@ def generate_construction_notice(data, output_path):
         "・騒音・振動が発生する作業は、事前にお知らせいたします。"
     )
     _add_body_paragraph(doc, "【安全対策について】", font_size=10, bold=True, space_after=4)
-    _add_body_paragraph(doc, safety, font_size=10, space_after=16)
+    safety_lines = safety.split("\n") if "\n" in safety else [safety]
+    for idx, line in enumerate(safety_lines):
+        sa = 16 if idx == len(safety_lines) - 1 else 2
+        _add_body_paragraph(doc, line, font_size=10, space_after=sa)
 
     # 問い合わせ先
     _add_body_paragraph(doc, "【お問い合わせ先】", font_size=10, bold=True, space_after=4)
