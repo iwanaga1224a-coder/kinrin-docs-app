@@ -447,6 +447,7 @@ WARD_CONFIG = {
         "height_threshold": "10m超（1低・2低では軒高7m超又は3階以上）",
         "sign_period": "",
         "regulation_url": "https://www.city.hachioji.tokyo.jp/jigyosha/005/10101/p021517.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -464,6 +465,7 @@ WARD_CONFIG = {
         "height_threshold": "10m超（1低・2低では軒高7m超又は3階以上）",
         "sign_period": "",
         "regulation_url": "https://www.city.tachikawa.lg.jp/shisei/machizukuri/1006749/1006798/1006805/1006819.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -481,6 +483,7 @@ WARD_CONFIG = {
         "height_threshold": "10m超（低層住居専用地域では軒高7m超又は3階以上）",
         "sign_period": "",
         "regulation_url": "https://www.city.musashino.lg.jp/kurashi_tetsuzuki/machizukuri/machizukurijorei/1008495.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -498,6 +501,7 @@ WARD_CONFIG = {
         "height_threshold": "10m超（低層住居専用地域では軒高7m超又は3階以上）",
         "sign_period": "",
         "regulation_url": "https://www.city.mitaka.lg.jp/c_service/003/003111.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -515,6 +519,7 @@ WARD_CONFIG = {
         "height_threshold": "10m超（1低・2低では軒高7m超又は3階以上）",
         "sign_period": "設置後3日以内に届出",
         "regulation_url": "https://www.city.fuchu.tokyo.jp/gyosei/hosin/jyorei/funso.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -532,6 +537,7 @@ WARD_CONFIG = {
         "height_threshold": "10m超（1低・2低・田園住居では軒高7m超又は3階以上）",
         "sign_period": "",
         "regulation_url": "https://www.city.chofu.lg.jp/080080/p051012.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -549,6 +555,7 @@ WARD_CONFIG = {
         "height_threshold": "10m超（低層住居専用地域では軒高7m超又は3階以上）。集合住宅9戸以上・延べ1,000m2超も対象",
         "sign_period": "確認申請の20日前（設置後5日以内に届出）",
         "regulation_url": "https://www.city.machida.tokyo.jp/kurashi/sumai/toshikei/t_01/zizenkyogi/funsouyobou.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -566,6 +573,7 @@ WARD_CONFIG = {
         "height_threshold": "10m超（低層住居専用地域では軒高7m超又は3階以上）",
         "sign_period": "",
         "regulation_url": "https://www.city.hino.lg.jp/shisei/machidukuri/kenchiku/1011311/1012077.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -583,6 +591,7 @@ WARD_CONFIG = {
         "height_threshold": "10m超又は3階以上（一戸建て住宅を除く）",
         "sign_period": "届出後7日以内に標識設置、設置後14日以内に説明",
         "regulation_url": "https://www.city.kokubunji.tokyo.jp/kurashi/koutsuu/jourei/1002248.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -600,6 +609,7 @@ WARD_CONFIG = {
         "height_threshold": "10m超（低層住居専用地域では軒高7m超又は3階以上）",
         "sign_period": "",
         "regulation_url": "https://www.city.nishitokyo.lg.jp/kurasi/sinseisyo/itiran/kenchiku_etc/71117820170322160507133.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -617,6 +627,7 @@ WARD_CONFIG = {
         "height_threshold": "10m超（低層住居専用地域では軒高7m超又は3階以上）",
         "sign_period": "設置後3日以内に届出（設置期間: 15日前/30日前 規模別）",
         "regulation_url": "https://www.city.kodaira.tokyo.jp/kurashi/086/086844.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -634,6 +645,7 @@ WARD_CONFIG = {
         "height_threshold": "10m超、又は10戸以上の共同住宅",
         "sign_period": "",
         "regulation_url": "https://www.city.tama.lg.jp/kurashi/machi/machidukuri/jorei/1005020.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -652,6 +664,7 @@ WARD_CONFIG = {
         "sign_period": "",
         "uses_metro_ordinance": True,
         "regulation_url": "https://www.city.ome.tokyo.jp/soshiki/41/287.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -669,6 +682,7 @@ WARD_CONFIG = {
         "height_threshold": "10m超（第1種低層住居専用地域では軒高7m超又は3階以上）",
         "sign_period": "",
         "uses_metro_ordinance": True,
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -687,6 +701,7 @@ WARD_CONFIG = {
         "sign_period": "",
         "uses_metro_ordinance": True,
         "regulation_url": "https://www.city.koganei.lg.jp/shisei/seisakukeikaku/machitoshi/machizukuri/chuukousouyousiki.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -705,6 +720,7 @@ WARD_CONFIG = {
         "sign_period": "",
         "uses_metro_ordinance": True,
         "regulation_url": "https://www.city.higashimurayama.tokyo.jp/shisei/machi/takuchi/kaihatu.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -723,6 +739,7 @@ WARD_CONFIG = {
         "sign_period": "",
         "uses_metro_ordinance": True,
         "regulation_url": "https://www.city.kunitachi.tokyo.jp/machi/keikaku/9355.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -741,6 +758,7 @@ WARD_CONFIG = {
         "sign_period": "",
         "uses_metro_ordinance": True,
         "regulation_url": "https://www.city.fussa.tokyo.jp/municipal/cityplan/inquiry/1003594.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -759,6 +777,7 @@ WARD_CONFIG = {
         "sign_period": "",
         "uses_metro_ordinance": True,
         "regulation_url": "https://www.city.komae.tokyo.jp/index.cfm/41,4630,315,html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -777,6 +796,7 @@ WARD_CONFIG = {
         "sign_period": "",
         "uses_metro_ordinance": True,
         "regulation_url": "https://www.city.higashiyamato.lg.jp/reiki/reiki_honbun/g144RG00000760.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -795,6 +815,7 @@ WARD_CONFIG = {
         "sign_period": "",
         "uses_metro_ordinance": True,
         "regulation_url": "https://www.city.kiyose.lg.jp/siseijouhou/machizukuri/kaihatu/1004482.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -813,6 +834,7 @@ WARD_CONFIG = {
         "sign_period": "",
         "uses_metro_ordinance": True,
         "regulation_url": "https://www.city.higashikurume.lg.jp/shisei/sesaku/toshi/takuchi/1002424.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -830,6 +852,7 @@ WARD_CONFIG = {
         "height_threshold": "10m超（第1種低層住居専用地域では軒高7m超又は3階以上）",
         "sign_period": "",
         "uses_metro_ordinance": True,
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -848,6 +871,7 @@ WARD_CONFIG = {
         "sign_period": "",
         "uses_metro_ordinance": True,
         "regulation_url": "https://www.city.inagi.tokyo.jp/kankyo/machi_zukuri/1009069/1009070.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -865,6 +889,7 @@ WARD_CONFIG = {
         "height_threshold": "10m超（第1種低層住居専用地域では軒高7m超又は3階以上）",
         "sign_period": "",
         "uses_metro_ordinance": True,
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,
@@ -883,6 +908,7 @@ WARD_CONFIG = {
         "sign_period": "",
         "uses_metro_ordinance": True,
         "regulation_url": "https://www.city.akiruno.tokyo.jp/0000000742.html",
+        "demolition_url": "",
         "demolition": {
             "target_area": 80,
             "sign_deadline_wood": 7,

@@ -187,15 +187,18 @@ def generate_demolition_report(data, output_path):
     _add_body_paragraph(doc, "")
 
     # 要綱文
+    suffix = wc.get("suffix", "区長").replace("長", "")  # "区長"→"区", "市長"→"市"
     _ordinance_ref = wc.get("demolition", {}).get("ordinance_name", "")
     if not _ordinance_ref:
-        _ordinance_ref = f"{ward_name}区建築物の解体工事の事前周知に関する要綱"
+        _ordinance_ref = f"{ward_name}{suffix}建築物の解体工事の事前周知に関する要綱"
     _add_body_paragraph(doc, f"　{_ordinance_ref}に基づき、下記のとおり報告します。", space_after=12)
 
     # メインテーブル
+    _addr_raw = data.get('site_address', '')
+    _addr_clean = _addr_raw.replace(f'東京都{ward_name}{suffix}', '').replace(f'{ward_name}{suffix}', '')
     rows_data = [
         ("工事の名称", data.get("site_name", "")),
-        ("所在地", f"{ward_name}区{data.get('site_address', '').replace(f'東京都{ward_name}区', '').replace(f'{ward_name}区', '')}"),
+        ("所在地", f"{ward_name}{suffix}{_addr_clean}"),
         ("工事期間", f"{data.get('start_date', '')} ～ {data.get('end_date', '')}"),
         ("延べ面積", f"{data.get('total_floor_area', '')} ㎡"),
         ("構造", data.get("structure", "")),

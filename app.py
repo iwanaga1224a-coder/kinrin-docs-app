@@ -378,6 +378,8 @@ if detected_ward:
             f"[{_wc_for_url['demolition_url']}]({_wc_for_url['demolition_url']})"
         )
         st.caption("※ URLは変更される場合があります。リンク切れの際は「○○区 解体工事 事前周知 届出」等で検索してください。")
+    elif is_demolition and not _wc_for_url.get("demolition_url"):
+        st.info(f"ℹ️ {detected_ward_suffix}には独自の解体事前周知制度がありません。建設リサイクル法に基づく届出は東京都多摩建築指導事務所が管轄です。")
     elif not is_demolition and _wc_for_url.get("regulation_url"):
         st.markdown(
             f"📎 **{detected_ward_suffix}の中高層条例・届出様式ページ**: "
@@ -1288,11 +1290,18 @@ if st.button("書類を一括生成", type="primary", use_container_width=True):
             if is_demolition:
                 st.success("解体工事用の書類を生成しました！")
                 _demo_url = _wc_for_url.get("demolition_url", "") if "_wc_for_url" in dir() else ""
-                st.info(
-                    f"**解体工事の「お知らせ看板」様式は区ごとに異なります。**\n\n"
-                    f"区の公式サイトから看板様式をダウンロードしてください。"
-                    + (f"\n\n🔗 [{_demo_url}]({_demo_url})" if _demo_url else "")
-                )
+                if _demo_url:
+                    st.info(
+                        f"**解体工事の「お知らせ看板」様式は自治体ごとに異なります。**\n\n"
+                        f"公式サイトから看板様式をダウンロードしてください。"
+                        f"\n\n🔗 [{_demo_url}]({_demo_url})"
+                    )
+                else:
+                    st.info(
+                        f"**この自治体には独自の解体事前周知制度がありません。**\n\n"
+                        f"建設リサイクル法に基づく届出（東京都多摩建築指導事務所）が必要です。\n\n"
+                        f"生成した書類は汎用様式です。提出前に管轄窓口にご確認ください。"
+                    )
             else:
                 st.success("書類の生成が完了しました！")
 
