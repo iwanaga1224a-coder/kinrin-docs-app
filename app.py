@@ -849,6 +849,41 @@ tab1, tab2, tab3, tab4 = st.tabs([
     "届出・その他",
 ])
 
+# 届出期限の逆算ヘルパー
+def _calc_deadline_info(start_date_str, ward_name):
+    """着工日と区名から届出期限の注釈テキストを生成"""
+    if not start_date_str or not ward_name:
+        return None
+    _wc_dl = get_ward_config(ward_name) if ward_name else None
+    if not _wc_dl:
+        return None
+    _sp = _wc_dl.get("sign_period", "")
+    if not _sp:
+        return None
+    import re as _re
+    _reiwa_m = _re.match(r"令和(\d+)年(\d+)月(\d+)日", start_date_str)
+    if not _reiwa_m:
+        return None
+    from datetime import date, timedelta
+    try:
+        _start_dt = date(int(_reiwa_m.group(1)) + 2018, int(_reiwa_m.group(2)), int(_reiwa_m.group(3)))
+    except ValueError:
+        return None
+    _days_list = sorted(set(int(x) for x in _re.findall(r"(\d+)日前", _sp)), reverse=True)
+    if not _days_list:
+        return None
+    lines = []
+    for _days in _days_list:
+        _dl = _start_dt - timedelta(days=_days)
+        _dl_reiwa = f"令和{_dl.year - 2018}年{_dl.month}月{_dl.day}日"
+        lines.append(f"**{_days}日前** → {_dl_reiwa}")
+    return {
+        "lines": lines,
+        "note": _sp,
+        "start_date": start_date_str,
+        "ward": ward_name,
+    }
+
 with tab1:
     site_name = st.text_input("工事名称 *", value=_ocr_val("site_name"), placeholder="○○ビル解体工事", key="_site_name_val")
     col1, col2 = st.columns(2)
@@ -928,36 +963,6 @@ with tab2:
         start_date = st.text_input("着工予定日", value=_ocr_val("start_date"), placeholder="令和8年5月1日", help=_field_help("start_date"))
         end_date = st.text_input("完了予定日", value=_ocr_val("end_date"), placeholder="令和8年10月31日", help=_field_help("end_date"))
 
-        # 着工日から届出期限を逆算して注釈表示
-        if start_date and detected_ward:
-            _wc_deadline = get_ward_config(detected_ward)
-            _sp = _wc_deadline.get("sign_period", "")
-            if _sp:
-                import re as _re
-                _reiwa_m = _re.match(r"令和(\d+)年(\d+)月(\d+)日", start_date)
-                if _reiwa_m:
-                    from datetime import date, timedelta
-                    _y = int(_reiwa_m.group(1)) + 2018
-                    _m = int(_reiwa_m.group(2))
-                    _d = int(_reiwa_m.group(3))
-                    try:
-                        _start_dt = date(_y, _m, _d)
-                        _days_list = sorted(set(int(x) for x in _re.findall(r"(\d+)日前", _sp)), reverse=True)
-                        if _days_list:
-                            _deadline_lines = []
-                            for _days in _days_list:
-                                _dl = _start_dt - timedelta(days=_days)
-                                _dl_reiwa = f"令和{_dl.year - 2018}年{_dl.month}月{_dl.day}日"
-                                _deadline_lines.append(f"**{_days}日前** → {_dl_reiwa}")
-                            st.warning(
-                                f"**届出期限の目安（{detected_ward}区）**\n\n"
-                                f"着工日 {start_date} から逆算:\n\n"
-                                + "\n\n".join(_deadline_lines)
-                                + f"\n\n※ {_sp}"
-                            )
-                    except ValueError:
-                        pass
-
         st.subheader("届出者（発注者・建築主）")
         applicant_name = st.text_input("届出者 氏名", value=_ocr_val("applicant_name"), placeholder="株式会社 ○○建設　代表取締役　○○ ○○", help=_field_help("applicant_name"))
         applicant_address = st.text_input("届出者 住所", value=_ocr_val("applicant_address"), placeholder="東京都千代田区○○1-1-1", help=_field_help("applicant_address"))
@@ -994,6 +999,16 @@ with tab3:
         unexplained_count = st.text_input("未説明戸数（不在等）", placeholder="5", help=_field_help("unexplained_count"))
     opinions = st.text_area("住民からの意見・要望", placeholder="特になし", height=100)
 
+    # 届出期限の目安（説明はこの期限より前に完了させる必要がある）
+    _dl_info = _calc_deadline_info(start_date, detected_ward)
+    if _dl_info:
+        st.info(
+            f"**説明のスケジュール目安（{_dl_info['ward']}区）**\n\n"
+            f"着工日 {_dl_info['start_date']} から逆算した届出期限:\n\n"
+            + "\n\n".join(_dl_info["lines"])
+            + f"\n\n近隣説明はこれらの期限 **より前** に完了させてください。\n\n※ {_dl_info['note']}"
+        )
+
 with tab4:
     col1, col2 = st.columns(2)
     with col1:
@@ -1003,6 +1018,16 @@ with tab4:
     with col2:
         holidays = st.text_input("休工日", value="日曜日・祝日")
         client_name = st.text_input("発注者名（工事のお知らせ用）", placeholder="株式会社 ○○建設")
+
+    # 届出期限の目安
+    _dl_info2 = _calc_deadline_info(start_date, detected_ward)
+    if _dl_info2:
+        st.warning(
+            f"**届出期限の目安（{_dl_info2['ward']}区）**\n\n"
+            f"着工日 {_dl_info2['start_date']} から逆算:\n\n"
+            + "\n\n".join(_dl_info2["lines"])
+            + f"\n\n届出日・標識設置日はこの期限に間に合うように設定してください。\n\n※ {_dl_info2['note']}"
+        )
 
 # ========== 入力チェックリスト ==========
 st.divider()
