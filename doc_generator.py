@@ -153,109 +153,175 @@ def generate_sign_notice(data, output_path):
 
 # ========== 1b. 解体工事事前周知報告書 ==========
 
+def _merge_cells_and_set(table, row1, col1, row2, col2, text, font_size=10, bold=False, align=WD_ALIGN_PARAGRAPH.LEFT):
+    """セルを結合してテキストを設定"""
+    cell = table.cell(row1, col1).merge(table.cell(row2, col2))
+    _set_cell(cell, text, font_size=font_size, bold=bold, align=align)
+    return cell
+
+
 def generate_demolition_report(data, output_path):
-    """解体工事事前周知報告書を生成（汎用様式）"""
+    """解体工事 事前周知報告書を生成（実際の区様式に準拠）"""
     ward_name = data.get("ward_name", "")
     wc = get_ward_config(ward_name)
+    suffix = wc.get("suffix", "区長").replace("長", "")  # "区長"→"区", "市長"→"市"
 
     doc = Document()
     section = doc.sections[0]
     section.page_width = Cm(21.0)
     section.page_height = Cm(29.7)
-    section.top_margin = Cm(2.0)
-    section.bottom_margin = Cm(2.0)
-    section.left_margin = Cm(2.5)
-    section.right_margin = Cm(2.5)
+    section.top_margin = Cm(1.5)
+    section.bottom_margin = Cm(1.5)
+    section.left_margin = Cm(2.0)
+    section.right_margin = Cm(2.0)
 
-    # ヘッダー
-    _add_heading_paragraph(doc, "建築物解体工事事前周知報告書", font_size=16)
-    _add_body_paragraph(doc, "", space_after=6)
+    # --- 様式番号 ---
+    _add_body_paragraph(doc, "様式（事前周知報告書）", font_size=9, space_after=2)
 
-    # 日付
-    _add_body_paragraph(doc, f"　　　　　　　　　　　　　　　　　　　　　　　　{data.get('submit_date', '　　年　　月　　日')}")
+    # --- 日付（右寄せ） ---
+    _add_body_paragraph(doc, data.get("submit_date", "　　年　　月　　日"),
+                        font_size=10.5, align=WD_ALIGN_PARAGRAPH.RIGHT, space_after=6)
 
-    # 提出先
-    _add_body_paragraph(doc, "（提出先）", font_size=9)
-    _add_body_paragraph(doc, f"　{ward_name}{wc['suffix']}")
-    _add_body_paragraph(doc, "")
+    # --- タイトル ---
+    _add_heading_paragraph(doc, "事 前 周 知 報 告 書", font_size=18)
+    _add_body_paragraph(doc, "", space_after=2)
 
-    # 発注者情報（右寄せ）
-    _add_body_paragraph(doc, "（法人にあっては名称及び代表者の氏名）", font_size=9, align=WD_ALIGN_PARAGRAPH.RIGHT)
-    _add_body_paragraph(doc, f"発注者等の氏名　{data.get('applicant_name', '')}", align=WD_ALIGN_PARAGRAPH.RIGHT)
-    _add_body_paragraph(doc, f"住　所　{data.get('applicant_address', '')}", align=WD_ALIGN_PARAGRAPH.RIGHT)
-    _add_body_paragraph(doc, f"電話番号　{data.get('applicant_tel', '')}", align=WD_ALIGN_PARAGRAPH.RIGHT)
-    _add_body_paragraph(doc, "")
+    # --- 宛先 ---
+    _add_body_paragraph(doc, f"　{ward_name}{wc['suffix']}　殿", font_size=11, space_after=10)
 
-    # 要綱文
-    suffix = wc.get("suffix", "区長").replace("長", "")  # "区長"→"区", "市長"→"市"
+    # --- 届出者（右寄せ） ---
+    _add_body_paragraph(doc, f"住　所　{data.get('applicant_address', '')}",
+                        font_size=10.5, align=WD_ALIGN_PARAGRAPH.RIGHT, space_after=2)
+    _add_body_paragraph(doc, f"氏　名　{data.get('applicant_name', '')}",
+                        font_size=10.5, align=WD_ALIGN_PARAGRAPH.RIGHT, space_after=2)
+    _add_body_paragraph(doc, "（法人にあっては名称、代表者の氏名）",
+                        font_size=8, align=WD_ALIGN_PARAGRAPH.RIGHT, space_after=8)
+
+    # --- 要綱文 ---
     _ordinance_ref = wc.get("demolition", {}).get("ordinance_name", "")
     if not _ordinance_ref:
-        _ordinance_ref = f"{ward_name}{suffix}建築物の解体工事の事前周知に関する要綱"
-    _add_body_paragraph(doc, f"　{_ordinance_ref}に基づき、下記のとおり報告します。", space_after=12)
+        _ordinance_ref = f"{ward_name}{suffix}建築物等の解体等工事に係る計画の事前周知に関する要綱"
+    _add_body_paragraph(doc,
+        f"　{_ordinance_ref}に基づく事前周知について以下のとおり報告します。",
+        font_size=10.5, space_after=8)
 
-    # メインテーブル
-    _addr_raw = data.get('site_address', '')
-    _addr_clean = _addr_raw.replace(f'東京都{ward_name}{suffix}', '').replace(f'{ward_name}{suffix}', '')
-    rows_data = [
-        ("工事の名称", data.get("site_name", "")),
-        ("所在地", f"{ward_name}{suffix}{_addr_clean}"),
-        ("工事期間", f"{data.get('start_date', '')} ～ {data.get('end_date', '')}"),
-        ("延べ面積", f"{data.get('total_floor_area', '')} ㎡"),
-        ("構造", data.get("structure", "")),
-        ("階数", f"地上 {data.get('floors_above', '')} 階　地下 {data.get('floors_below', '')} 階"),
-        ("解体工事施工者", data.get("constructor_name", "")),
-        ("現場責任者", data.get("site_manager", "")),
-        ("連絡先", data.get("constructor_tel", "")),
-        ("作業時間", data.get("work_hours", "午前8時00分 ～ 午後5時00分")),
-        ("休工日", data.get("holidays", "日曜日・祝日")),
-    ]
-
-    table = doc.add_table(rows=len(rows_data), cols=2)
+    # ======= メインテーブル（1つの表で全項目）=======
+    # 行構成:
+    #  0: 解体等工事の名称
+    #  1: 解体等工事の場所
+    #  2-4: 解体建築物等の概要（延べ面積/階数, 構造/高さ, 竣工年/改修歴）
+    #  5: 工事予定期間
+    #  6-7: 発注者（氏名, 住所/電話）
+    #  8-9: 元請業者（会社名(代表者), 住所/電話）
+    # 10-11: 下請負人（会社名(代表者), 住所/電話）
+    # 12-13: 問合せ先担当者（会社名, 氏名/電話）
+    # 14-15: 近隣説明（説明時期, 実施方法）
+    # 16-18: 添付書類
+    COL = 6  # 6列テーブル
+    ROWS = 19
+    table = doc.add_table(rows=ROWS, cols=COL)
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     _set_table_borders(table)
 
-    for i, (label, value) in enumerate(rows_data):
-        _set_cell(table.cell(i, 0), label, font_size=10, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
-        _set_cell(table.cell(i, 1), value, font_size=10)
-        table.cell(i, 0).width = Cm(4.0)
-        table.cell(i, 1).width = Cm(12.0)
+    _addr_raw = data.get("site_address", "")
+    _addr_clean = _addr_raw.replace(f"東京都{ward_name}{suffix}", "").replace(f"{ward_name}{suffix}", "")
 
-    _add_body_paragraph(doc, "", space_after=6)
+    # --- Row 0: 解体等工事の名称 ---
+    _merge_cells_and_set(table, 0, 0, 0, 1, "解体等工事の名称", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _merge_cells_and_set(table, 0, 2, 0, 5, data.get("site_name", ""), 10)
 
-    # 説明状況テーブル
-    _add_body_paragraph(doc, "近隣への事前周知の状況", bold=True, space_after=6)
-    explain_rows = [
-        ("説明実施日", data.get("explanation_date", "")),
-        ("説明方法", data.get("explanation_method", "個別訪問による説明")),
-        ("説明範囲", data.get("explanation_range", f"敷地境界から{data.get('radius_m', 10)}m以内の近隣住民")),
-        ("説明対象戸数", f"{data.get('target_count', '')} 戸"),
-        ("説明済み戸数", f"{data.get('explained_count', '')} 戸"),
-        ("未説明戸数", f"{data.get('unexplained_count', '')} 戸"),
-    ]
+    # --- Row 1: 解体等工事の場所 ---
+    _merge_cells_and_set(table, 1, 0, 1, 1, "解体等工事の場所", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _merge_cells_and_set(table, 1, 2, 1, 5, f"{ward_name}{suffix}{_addr_clean}", 10)
 
-    table2 = doc.add_table(rows=len(explain_rows), cols=2)
-    table2.alignment = WD_TABLE_ALIGNMENT.CENTER
-    _set_table_borders(table2)
-    for i, (label, value) in enumerate(explain_rows):
-        _set_cell(table2.cell(i, 0), label, font_size=10, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
-        _set_cell(table2.cell(i, 1), value, font_size=10)
-        table2.cell(i, 0).width = Cm(4.0)
-        table2.cell(i, 1).width = Cm(12.0)
+    # --- Row 2-4: 解体建築物等の概要 ---
+    _merge_cells_and_set(table, 2, 0, 4, 0, "解体建築物等\nの　概　要", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    # Row 2: 延べ面積 / 階数
+    _set_cell(table.cell(2, 1), "延べ面積", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _set_cell(table.cell(2, 2), f"{data.get('total_floor_area', '')} ㎡", 10)
+    _set_cell(table.cell(2, 3), "階　数", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _merge_cells_and_set(table, 2, 4, 2, 5,
+        f"地上 {data.get('floors_above', '')} 階、地下 {data.get('floors_below', '')} 階", 10)
+    # Row 3: 構造 / 高さ
+    _set_cell(table.cell(3, 1), "構　造", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _set_cell(table.cell(3, 2), data.get("structure", ""), 10)
+    _set_cell(table.cell(3, 3), "高　さ", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _merge_cells_and_set(table, 3, 4, 3, 5, f"{data.get('height', '')} m", 10)
+    # Row 4: 竣工年 / 改修歴
+    _set_cell(table.cell(4, 1), "竣工年又は\n築年数", 8, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _set_cell(table.cell(4, 2), data.get("construction_year", ""), 10)
+    _set_cell(table.cell(4, 3), "増改築、\n改修歴", 8, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _merge_cells_and_set(table, 4, 4, 4, 5, data.get("renovation_history", "無"), 10)
 
-    _add_body_paragraph(doc, "", space_after=6)
+    # --- Row 5: 工事予定期間 ---
+    _merge_cells_and_set(table, 5, 0, 5, 1, "工事予定期間", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _merge_cells_and_set(table, 5, 2, 5, 5,
+        f"{data.get('start_date', '')} から {data.get('end_date', '')} まで", 10)
 
-    # 住民からの意見
-    _add_body_paragraph(doc, "近隣住民からの意見・要望とその対応", bold=True, space_after=6)
-    opinions = data.get("opinions", "特になし")
-    opinion_lines = opinions.split("\n") if "\n" in opinions else [opinions]
-    for idx, line in enumerate(opinion_lines):
-        sa = 12 if idx == len(opinion_lines) - 1 else 2
-        _add_body_paragraph(doc, f"　{line}", space_after=sa)
+    # --- Row 6-7: 発注者 ---
+    _merge_cells_and_set(table, 6, 0, 7, 1, "発　注　者\n（法人にあっては名称、\n代表者の氏名）", 8, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _set_cell(table.cell(6, 2), "氏　名", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _merge_cells_and_set(table, 6, 3, 6, 5, data.get("applicant_name", ""), 10)
+    _set_cell(table.cell(7, 2), "住　所", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _set_cell(table.cell(7, 3), data.get("applicant_address", ""), 10)
+    _set_cell(table.cell(7, 4), "電　話", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _set_cell(table.cell(7, 5), data.get("applicant_tel", ""), 10)
 
-    # 添付書類
-    _add_body_paragraph(doc, "添付書類", bold=True, font_size=9)
-    _add_body_paragraph(doc, "　１．現場案内図", font_size=9)
-    _add_body_paragraph(doc, "　２．近隣説明範囲図", font_size=9)
+    # --- Row 8-9: 元請業者 ---
+    _merge_cells_and_set(table, 8, 0, 9, 1, "元 請 業 者", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _set_cell(table.cell(8, 2), "会社名（代表者）", 8, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _merge_cells_and_set(table, 8, 3, 8, 5, data.get("constructor_name", ""), 10)
+    _set_cell(table.cell(9, 2), "住　所", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _set_cell(table.cell(9, 3), data.get("constructor_address", ""), 10)
+    _set_cell(table.cell(9, 4), "電　話", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _set_cell(table.cell(9, 5), data.get("constructor_tel", ""), 10)
+
+    # --- Row 10-11: 下請負人 ---
+    _merge_cells_and_set(table, 10, 0, 11, 1, "下 請 負 人", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _set_cell(table.cell(10, 2), "会社名（代表者）", 8, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _merge_cells_and_set(table, 10, 3, 10, 5, data.get("subcontractor_name", ""), 10)
+    _set_cell(table.cell(11, 2), "住　所", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _set_cell(table.cell(11, 3), data.get("subcontractor_address", ""), 10)
+    _set_cell(table.cell(11, 4), "電　話", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _set_cell(table.cell(11, 5), data.get("subcontractor_tel", ""), 10)
+
+    # --- Row 12-13: 問合せ先担当者 ---
+    _merge_cells_and_set(table, 12, 0, 13, 1, "問合せ先担当者", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _set_cell(table.cell(12, 2), "会社名", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _merge_cells_and_set(table, 12, 3, 12, 5, data.get("constructor_name", ""), 10)
+    _set_cell(table.cell(13, 2), "氏　名", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _set_cell(table.cell(13, 3), data.get("site_manager", ""), 10)
+    _set_cell(table.cell(13, 4), "電　話", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _set_cell(table.cell(13, 5), data.get("constructor_tel", ""), 10)
+
+    # --- Row 14-15: 近隣説明 ---
+    _merge_cells_and_set(table, 14, 0, 15, 1, "近 隣 説 明", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    # Row 14: 説明時期
+    _set_cell(table.cell(14, 2), "説明時期", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _merge_cells_and_set(table, 14, 3, 14, 5, data.get("explanation_date", ""), 10)
+    # Row 15: 実施方法
+    _set_cell(table.cell(15, 2), "実施方法", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    # チェックボックス風の表示
+    _method = data.get("explanation_method", "個別訪問による説明")
+    _chk_meeting = "■" if "説明会" in _method else "□"
+    _chk_visit = "■" if "個別訪問" in _method else "□"
+    _chk_paper = "■" if "書面" in _method or "ポスティング" in _method else "□"
+    _merge_cells_and_set(table, 15, 3, 15, 5,
+        f"{_chk_meeting} 説明会　　{_chk_visit} 個別訪問　　{_chk_paper} 書面配付", 10)
+
+    # --- Row 16-18: 添付書類 ---
+    _merge_cells_and_set(table, 16, 0, 18, 1, "添 付 書 類", 9, True, WD_ALIGN_PARAGRAPH.CENTER)
+    _merge_cells_and_set(table, 16, 2, 16, 5,
+        "□ 案内図（説明を行った家等が分かるようにマーキングすること）", 9)
+    _merge_cells_and_set(table, 17, 2, 17, 5,
+        "□ 説明に使用したチラシ等（近隣説明範囲図を含む）", 9)
+    _merge_cells_and_set(table, 18, 2, 18, 5,
+        "※ 工事対象建物の写真（遠景、近景等）があれば、添付してください。", 8)
+
+    _add_body_paragraph(doc, "", space_after=4)
+
+    # --- 備考 ---
+    _add_body_paragraph(doc, "備考：提出部数　2部（副本の返却が必要なければ1部で可）", font_size=8, space_after=2)
 
     doc.save(output_path)
     return output_path
