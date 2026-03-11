@@ -151,6 +151,113 @@ def generate_sign_notice(data, output_path):
     return output_path
 
 
+# ========== 1b. 解体工事事前周知報告書 ==========
+
+def generate_demolition_report(data, output_path):
+    """解体工事事前周知報告書を生成（汎用様式）"""
+    ward_name = data.get("ward_name", "")
+    wc = get_ward_config(ward_name)
+
+    doc = Document()
+    section = doc.sections[0]
+    section.page_width = Cm(21.0)
+    section.page_height = Cm(29.7)
+    section.top_margin = Cm(2.0)
+    section.bottom_margin = Cm(2.0)
+    section.left_margin = Cm(2.5)
+    section.right_margin = Cm(2.5)
+
+    # ヘッダー
+    _add_heading_paragraph(doc, "建築物解体工事事前周知報告書", font_size=16)
+    _add_body_paragraph(doc, "", space_after=6)
+
+    # 日付
+    _add_body_paragraph(doc, f"　　　　　　　　　　　　　　　　　　　　　　　　{data.get('submit_date', '　　年　　月　　日')}")
+
+    # 提出先
+    _add_body_paragraph(doc, "（提出先）", font_size=9)
+    _add_body_paragraph(doc, f"　{ward_name}{wc['suffix']}")
+    _add_body_paragraph(doc, "")
+
+    # 発注者情報（右寄せ）
+    _add_body_paragraph(doc, "（法人にあっては名称及び代表者の氏名）", font_size=9, align=WD_ALIGN_PARAGRAPH.RIGHT)
+    _add_body_paragraph(doc, f"発注者等の氏名　{data.get('applicant_name', '')}", align=WD_ALIGN_PARAGRAPH.RIGHT)
+    _add_body_paragraph(doc, f"住　所　{data.get('applicant_address', '')}", align=WD_ALIGN_PARAGRAPH.RIGHT)
+    _add_body_paragraph(doc, f"電話番号　{data.get('applicant_tel', '')}", align=WD_ALIGN_PARAGRAPH.RIGHT)
+    _add_body_paragraph(doc, "")
+
+    # 要綱文
+    _ordinance_ref = wc.get("demolition", {}).get("ordinance_name", "")
+    if not _ordinance_ref:
+        _ordinance_ref = f"{ward_name}区建築物の解体工事の事前周知に関する要綱"
+    _add_body_paragraph(doc, f"　{_ordinance_ref}に基づき、下記のとおり報告します。", space_after=12)
+
+    # メインテーブル
+    rows_data = [
+        ("工事の名称", data.get("site_name", "")),
+        ("所在地", f"{ward_name}区{data.get('site_address', '').replace(f'東京都{ward_name}区', '').replace(f'{ward_name}区', '')}"),
+        ("工事期間", f"{data.get('start_date', '')} ～ {data.get('end_date', '')}"),
+        ("延べ面積", f"{data.get('total_floor_area', '')} ㎡"),
+        ("構造", data.get("structure", "")),
+        ("階数", f"地上 {data.get('floors_above', '')} 階　地下 {data.get('floors_below', '')} 階"),
+        ("解体工事施工者", data.get("constructor_name", "")),
+        ("現場責任者", data.get("site_manager", "")),
+        ("連絡先", data.get("constructor_tel", "")),
+        ("作業時間", data.get("work_hours", "午前8時00分 ～ 午後5時00分")),
+        ("休工日", data.get("holidays", "日曜日・祝日")),
+    ]
+
+    table = doc.add_table(rows=len(rows_data), cols=2)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    _set_table_borders(table)
+
+    for i, (label, value) in enumerate(rows_data):
+        _set_cell(table.cell(i, 0), label, font_size=10, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
+        _set_cell(table.cell(i, 1), value, font_size=10)
+        table.cell(i, 0).width = Cm(4.0)
+        table.cell(i, 1).width = Cm(12.0)
+
+    _add_body_paragraph(doc, "", space_after=6)
+
+    # 説明状況テーブル
+    _add_body_paragraph(doc, "近隣への事前周知の状況", bold=True, space_after=6)
+    explain_rows = [
+        ("説明実施日", data.get("explanation_date", "")),
+        ("説明方法", data.get("explanation_method", "個別訪問による説明")),
+        ("説明範囲", data.get("explanation_range", f"敷地境界から{data.get('radius_m', 10)}m以内の近隣住民")),
+        ("説明対象戸数", f"{data.get('target_count', '')} 戸"),
+        ("説明済み戸数", f"{data.get('explained_count', '')} 戸"),
+        ("未説明戸数", f"{data.get('unexplained_count', '')} 戸"),
+    ]
+
+    table2 = doc.add_table(rows=len(explain_rows), cols=2)
+    table2.alignment = WD_TABLE_ALIGNMENT.CENTER
+    _set_table_borders(table2)
+    for i, (label, value) in enumerate(explain_rows):
+        _set_cell(table2.cell(i, 0), label, font_size=10, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
+        _set_cell(table2.cell(i, 1), value, font_size=10)
+        table2.cell(i, 0).width = Cm(4.0)
+        table2.cell(i, 1).width = Cm(12.0)
+
+    _add_body_paragraph(doc, "", space_after=6)
+
+    # 住民からの意見
+    _add_body_paragraph(doc, "近隣住民からの意見・要望とその対応", bold=True, space_after=6)
+    opinions = data.get("opinions", "特になし")
+    opinion_lines = opinions.split("\n") if "\n" in opinions else [opinions]
+    for idx, line in enumerate(opinion_lines):
+        sa = 12 if idx == len(opinion_lines) - 1 else 2
+        _add_body_paragraph(doc, f"　{line}", space_after=sa)
+
+    # 添付書類
+    _add_body_paragraph(doc, "添付書類", bold=True, font_size=9)
+    _add_body_paragraph(doc, "　１．現場案内図", font_size=9)
+    _add_body_paragraph(doc, "　２．近隣説明範囲図", font_size=9)
+
+    doc.save(output_path)
+    return output_path
+
+
 # ========== 2. 近隣説明報告書 ==========
 
 def generate_explanation_report(data, output_path):

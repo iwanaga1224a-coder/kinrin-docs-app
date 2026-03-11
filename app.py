@@ -24,6 +24,7 @@ from nearby_search import search_nearby, format_nearby_list
 from doc_generator import (
     generate_sign_notice,
     generate_explanation_report,
+    generate_demolition_report,
     generate_construction_notice,
     generate_map_document,
 )
@@ -223,8 +224,8 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("""
 **生成される書類**
 - 近隣説明範囲図（地図付き）
-- 標識設置届（新築・増築のみ / 公式様式 19区対応）
-- 近隣説明報告書
+- 標識設置届（新築） / 事前周知報告書（解体）
+- 近隣説明報告書（新築のみ）
 - 工事のお知らせ
 """)
 st.sidebar.markdown("---")
@@ -1221,20 +1222,27 @@ if st.button("書類を一括生成", type="primary", use_container_width=True):
             generate_map_document(data, map_png, map_docx, building_pins=st.session_state.get("building_pins", []))
             progress.progress(25, text="標識設置届を生成中...")
 
-            # 2. 標識設置届（解体工事では別様式のためスキップし案内を出す）
+            # 2. 標識設置届 or 解体事前周知報告書
             from template_filler import get_available_templates
             tpl = get_available_templates(ward)
             sign_path = None
-            if not is_demolition:
+            demolition_report_path = None
+            if is_demolition:
+                # 解体: 事前周知報告書を生成
+                demolition_report_path = os.path.join(tmpdir, "02_解体工事事前周知報告書.docx")
+                generate_demolition_report(data, demolition_report_path)
+            else:
                 sign_ext = ".xlsx" if tpl["sign_notice"] == "xlsx" else ".docx"
                 sign_path = os.path.join(tmpdir, f"02_標識設置届{sign_ext}")
                 generate_sign_notice(data, sign_path)
-            progress.progress(50, text="近隣説明報告書を生成中...")
+            progress.progress(50, text="近隣説明報告書を生成中..." if not is_demolition else "工事のお知らせを生成中...")
 
-            # 3. 報告書（公式テンプレートがあればそちらを使用）
-            report_ext = ".xlsx" if tpl["report"] == "xlsx" else ".docx"
-            report_path = os.path.join(tmpdir, f"03_近隣説明報告書{report_ext}")
-            generate_explanation_report(data, report_path)
+            # 3. 報告書（新築のみ。解体は事前周知報告書で代替済み）
+            report_path = None
+            if not is_demolition:
+                report_ext = ".xlsx" if tpl["report"] == "xlsx" else ".docx"
+                report_path = os.path.join(tmpdir, f"03_近隣説明報告書{report_ext}")
+                generate_explanation_report(data, report_path)
             progress.progress(75, text="工事のお知らせを生成中...")
 
             # 4. お知らせ
@@ -1258,14 +1266,17 @@ if st.button("書類を一括生成", type="primary", use_container_width=True):
             # ZIPにまとめる
             _zip_files = [
                 "01_近隣説明範囲図.docx",
-                f"03_近隣説明報告書{report_ext}",
                 "04_工事のお知らせ.docx",
                 "05_近隣施設一覧.txt",
                 "近隣説明範囲図.png",
             ]
-            if sign_path:
+            if is_demolition:
+                _zip_files.insert(1, "02_解体工事事前周知報告書.docx")
+            else:
                 sign_ext = ".xlsx" if tpl["sign_notice"] == "xlsx" else ".docx"
                 _zip_files.insert(1, f"02_標識設置届{sign_ext}")
+                report_ext = ".xlsx" if tpl["report"] == "xlsx" else ".docx"
+                _zip_files.insert(2, f"03_近隣説明報告書{report_ext}")
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
                 for fname in _zip_files:
@@ -1275,14 +1286,12 @@ if st.button("書類を一括生成", type="primary", use_container_width=True):
             zip_buffer.seek(0)
 
             if is_demolition:
-                from ward_config import get_ward_config as _gwc
-                _wc_demo = _gwc(ward).get("demolition", {})
-                _demo_note = _wc_demo.get("form_note", "")
-                st.success("書類の生成が完了しました！")
-                st.warning(
-                    f"**解体工事の標識設置届は新築とは別様式のため、このツールでは生成していません。**\n\n"
-                    f"- {detected_ward_full}の手続き: {_demo_note}\n"
-                    f"- 解体工事の「お知らせ看板」様式は区の公式サイトからダウンロードしてください。"
+                st.success("解体工事用の書類を生成しました！")
+                _demo_url = _wc_for_url.get("demolition_url", "") if "_wc_for_url" in dir() else ""
+                st.info(
+                    f"**解体工事の「お知らせ看板」様式は区ごとに異なります。**\n\n"
+                    f"区の公式サイトから看板様式をダウンロードしてください。"
+                    + (f"\n\n🔗 [{_demo_url}]({_demo_url})" if _demo_url else "")
                 )
             else:
                 st.success("書類の生成が完了しました！")
@@ -1301,7 +1310,7 @@ if st.button("書類を一括生成", type="primary", use_container_width=True):
                 if is_demolition:
                     col1, col2, col3 = st.columns(3)
                     col1.metric("近隣説明範囲図", "01_.docx")
-                    col2.metric("近隣説明報告書", "03_.docx")
+                    col2.metric("事前周知報告書", "02_.docx")
                     col3.metric("工事のお知らせ", "04_.docx")
                 else:
                     col1, col2, col3, col4 = st.columns(4)
