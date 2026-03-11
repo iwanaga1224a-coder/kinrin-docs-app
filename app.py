@@ -466,6 +466,8 @@ if detected_ward:
             mime="text/plain",
         )
 
+st.markdown('<div class="step-header"><div class="step-number" style="background:#e65100;">⚙</div><div class="step-title">近隣説明範囲の設定</div></div>', unsafe_allow_html=True)
+
 col_rule1, col_rule2, col_rule3 = st.columns(3)
 with col_rule1:
     range_type = st.selectbox("説明範囲の種類", [
