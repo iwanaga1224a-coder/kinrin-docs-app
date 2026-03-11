@@ -102,7 +102,7 @@ def generate_map_html(site_name, address, lat, lng, radius_m=50, zoom_override=N
         border: 2px solid #333;
         padding: 14px 32px;
         min-width: 500px;
-        font-family: 'Yu Gothic', 'MS Gothic', sans-serif;
+        font-family: 'Noto Sans CJK JP', 'Noto Sans JP', 'Yu Gothic', 'MS Gothic', sans-serif;
         box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
     ">
         <div style="font-size:14px;font-weight:bold;text-align:center;margin-bottom:10px;border-bottom:1px solid #ccc;padding-bottom:8px;">
@@ -132,7 +132,7 @@ def generate_map_html(site_name, address, lat, lng, radius_m=50, zoom_override=N
         border: 2px solid #333;
         padding: 10px 14px;
         font-size: 12px;
-        font-family: 'Yu Gothic', 'MS Gothic', sans-serif;
+        font-family: 'Noto Sans CJK JP', 'Noto Sans JP', 'Yu Gothic', 'MS Gothic', sans-serif;
         line-height: 1.8;
         box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
     ">
