@@ -237,7 +237,7 @@ st.sidebar.caption("届出前に必ず管轄窓口で内容をご確認くださ
 st.markdown('<div class="step-header"><div class="step-number">1</div><div class="step-title">工事場所</div></div>', unsafe_allow_html=True)
 
 # --- 書類アップロードによる自動入力 ---
-from ocr_extractor import is_available as ocr_available, extract_from_file, EXTRACT_FIELDS
+from ocr_extractor import is_available as ocr_available, extract_from_file, extract_asbestos_info, EXTRACT_FIELDS, ASBESTOS_FIELDS
 
 with st.expander("📄 書類をアップロードして自動入力", expanded=False):
     st.caption(
@@ -306,54 +306,79 @@ if site_address:
         from ward_config import get_ward_config
         wc = get_ward_config(detected_ward)
 
-        # カード風の判定結果
-        st.markdown(f"""
-        <div class="info-card detected">
-            <div class="label">届出先（自動判定）</div>
-            <div class="value">{detected_ward_full}</div>
-            <div style="font-size:0.85rem; color:#475569; margin-top:0.3rem;">{wc['ordinance_name']}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # 届出要件の詳細表示
-        req_cols = st.columns(3)
-        with req_cols[0]:
-            st.markdown(f"**標識設置根拠:** {wc['sign_article']}")
-        with req_cols[1]:
-            st.markdown(f"**説明義務根拠:** {wc['explanation_article']}")
-        with req_cols[2]:
-            if wc.get("height_threshold"):
-                st.markdown(f"**対象:** {wc['height_threshold']}")
-        if wc.get("sign_period"):
-            st.warning(f"標識届出期限: {wc['sign_period']}")
-        if wc.get("note"):
-            st.info(f"{detected_ward_full}の注意点: {wc['note']}")
-        if wc.get("uses_metro_ordinance"):
-            st.warning("この区は独自条例がなく、東京都条例が適用されます。届出先は東京都になる場合があります。")
-        # 公式テンプレート利用状況
-        from template_filler import get_available_templates
-        tpl_avail = get_available_templates(detected_ward)
         if is_demolition:
+            # === 解体モード: 解体専用の情報を表示 ===
             _demo_cfg = wc.get("demolition", {})
+            _demo_ordinance = _demo_cfg.get("ordinance_name", "解体工事に関する要綱")
+            st.markdown(f"""
+            <div class="info-card detected">
+                <div class="label">届出先（自動判定）</div>
+                <div class="value">{detected_ward_full}</div>
+                <div style="font-size:0.85rem; color:#475569; margin-top:0.3rem;">{_demo_ordinance}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
             _deadline_w = _demo_cfg.get("sign_deadline_wood", "要確認")
             _deadline_o = _demo_cfg.get("sign_deadline_other", "要確認")
             _target = _demo_cfg.get("target_area", 80)
             _note = _demo_cfg.get("form_note", "")
             _target_str = "全ての建物" if _target == 0 else f"延べ面積{_target}m²以上"
-            _ordinance = _demo_cfg.get("ordinance_name", "")
             _scope = _demo_cfg.get("scope_rule", "")
             _large = _demo_cfg.get("large_building_criteria", "")
-            st.markdown(f"""
-**🔧 解体工事の届出ルール（{detected_ward_full}）**
-{f'- 根拠: {_ordinance}' if _ordinance else ''}
-- 対象: {_target_str}
-- 標識設置期限: その他 **{_deadline_w}日前** ／ 大規模 **{_deadline_o}日前**
-{f'- 大規模建築物等: {_large}' if _large else ''}
-{f'- 説明範囲: {_scope}' if _scope else ''}
-- {_note}
-""")
-            st.caption("⚠️ 解体工事のお知らせ標識は本アプリで生成可能です。印刷時にA3以上に拡大してください。")
+            _submit_to = _demo_cfg.get("submit_to", "")
+
+            req_cols = st.columns(3)
+            with req_cols[0]:
+                st.markdown(f"**対象:** {_target_str}")
+            with req_cols[1]:
+                st.markdown(f"**掲示期限:** 小規模 **{_deadline_w}日前** ／ 大規模 **{_deadline_o}日前**")
+            with req_cols[2]:
+                if _submit_to:
+                    st.markdown(f"**届出先:** {_submit_to}")
+
+            if _large:
+                st.warning(f"規模による（{_large}）")
+            st.caption("⚠️ 解体工事のお知らせ標識・報告書は本アプリで生成可能です。印刷時にA3以上に拡大してください。")
         else:
+            # === 新築・増築モード: 中高層条例の情報を表示 ===
+            st.markdown(f"""
+            <div class="info-card detected">
+                <div class="label">届出先（自動判定）</div>
+                <div class="value">{detected_ward_full}</div>
+                <div style="font-size:0.85rem; color:#475569; margin-top:0.3rem;">{wc['ordinance_name']}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            req_cols = st.columns(3)
+            with req_cols[0]:
+                st.markdown(f"**標識設置根拠:** {wc['sign_article']}")
+            with req_cols[1]:
+                st.markdown(f"**説明義務根拠:** {wc['explanation_article']}")
+            with req_cols[2]:
+                if wc.get("height_threshold"):
+                    st.markdown(f"**対象:** {wc['height_threshold']}")
+            if wc.get("sign_period"):
+                st.warning(f"標識届出期限: {wc['sign_period']}")
+            if wc.get("note"):
+                st.info(f"{detected_ward_full}の注意点: {wc['note']}")
+            if wc.get("uses_metro_ordinance"):
+                st.warning("この区は独自条例がなく、東京都条例が適用されます。届出先は東京都になる場合があります。")
+
+        # 公式テンプレート利用状況
+        from template_filler import get_available_templates, get_available_demolition_templates
+        if is_demolition:
+            demo_tpl = get_available_demolition_templates(detected_ward)
+            if demo_tpl.get("sign") or demo_tpl.get("report"):
+                _tpl_types = []
+                if demo_tpl.get("sign"):
+                    _tpl_types.append("標識")
+                if demo_tpl.get("report"):
+                    _tpl_types.append("報告書")
+                st.caption(f"様式: {detected_ward_full}の解体工事用**公式様式**を使用（{'・'.join(_tpl_types)}）")
+            else:
+                st.caption(f"様式: {detected_ward_full}は解体用の汎用フォーマットで生成します（公式様式は未対応）")
+        else:
+            tpl_avail = get_available_templates(detected_ward)
             if tpl_avail["sign_notice"]:
                 st.caption(f"様式: {detected_ward_full}の公式様式を使用（{tpl_avail['sign_notice'].upper()}形式）")
             else:
@@ -466,7 +491,10 @@ if detected_ward:
         if not is_demolition:
             st.markdown(f"- **記載事項**: {sr['content']}")
         st.info(f"💡 {sr['note']}")
-        st.caption("⚠️ 看板の実物（現場掲示用）はこのツールでは生成しません。公式サイトから様式をダウンロードして作成してください。")
+        if is_demolition:
+            st.caption("✅ 解体工事のお知らせ標識は本アプリで生成できます。A3以上に拡大して掲示してください。")
+        else:
+            st.caption("⚠️ 看板の実物（現場掲示用）はこのツールでは生成しません。公式サイトから様式をダウンロードして作成してください。")
         if _display_url:
             st.caption(f"　→ 公式ページ: {_display_url}")
 
@@ -1012,12 +1040,27 @@ with tab1:
     specific_construction_status = ""
     rodent_control_status = ""
 
+    # 石綿関連の初期値
+    asbestos_level = ""
+    asbestos_locations = ""
+    asbestos_types = ""
+    asbestos_survey_date = ""
+    asbestos_survey_company = ""
+    asbestos_surveyor = ""
+    asbestos_area = ""
+    # 下請負人の初期値
+    subcontractor_name = ""
+    subcontractor_address = ""
+    subcontractor_tel = ""
+
     if is_demolition:
         st.markdown("**解体工事の詳細**")
         col_demo1, col_demo2 = st.columns(2)
         with col_demo1:
-            construction_year = st.text_input("竣工年又は築年数", placeholder="昭和55年（築45年）",
-                                              help="報告書の「解体建築物等の概要」に記載")
+            construction_year = st.text_input("竣工年又は築年数",
+                value=st.session_state.get("_asb_construction_year", ""),
+                placeholder="昭和55年（築45年）",
+                help="報告書の「解体建築物等の概要」に記載")
             renovation_history = st.text_input("増改築・改修歴", value="無", placeholder="平成10年 外壁改修",
                                                help="報告書に記載")
             demolition_method = st.selectbox("解体方法", [
@@ -1036,12 +1079,104 @@ with tab1:
             asbestos_removal_method = ""
             if asbestos_status == "有り":
                 asbestos_removal_method = st.text_input("石綿等の除去方法",
+                    value=st.session_state.get("_asb_removal_method", ""),
                     placeholder="隔離養生の上、湿潤化して手作業で除去",
                     help="石綿ありの場合に標識・報告書に記載")
             transport_route = st.text_input("搬出経路", placeholder="現場北側より○○通りへ搬出",
                                             help="標識に記載")
             vehicle_route = st.text_input("工事車両通行経路", placeholder="○○通り→△△交差点→□□通り",
                                           help="標識に記載")
+
+        # --- 石綿事前調査結果アップロード ---
+        st.markdown("---")
+        st.markdown("**石綿（アスベスト）事前調査結果**")
+        st.caption(
+            "石綿事前調査結果報告書（PDF・画像）をアップロードすると、"
+            "OCRで石綿情報を自動抽出してフォームに入力します。手動入力も可能です。"
+        )
+        if ocr_available():
+            asbestos_file = st.file_uploader(
+                "石綿事前調査結果報告書",
+                type=["pdf", "png", "jpg", "jpeg", "webp"],
+                key="asbestos_upload",
+                help="大気汚染防止法に基づく石綿事前調査結果報告書をアップロード",
+            )
+            if asbestos_file is not None:
+                if st.button("石綿情報を読み取る", key="asbestos_ocr_btn"):
+                    with st.spinner("石綿調査報告書を読み取り中...（10〜20秒）"):
+                        asb_bytes = asbestos_file.read()
+                        asb_result, asb_raw = extract_asbestos_info(
+                            asb_bytes, asbestos_file.name, asbestos_file.type
+                        )
+                    if asb_result:
+                        # session_stateに保存してフォームに反映
+                        _asb_map = {
+                            "asbestos_level": "_asb_level",
+                            "asbestos_locations": "_asb_locations",
+                            "asbestos_types": "_asb_types",
+                            "asbestos_survey_date": "_asb_survey_date",
+                            "asbestos_survey_company": "_asb_survey_company",
+                            "asbestos_surveyor": "_asb_surveyor",
+                            "asbestos_removal_method": "_asb_removal_method",
+                            "asbestos_area": "_asb_area",
+                            "building_construction_year": "_asb_construction_year",
+                        }
+                        for src_key, dst_key in _asb_map.items():
+                            if asb_result.get(src_key):
+                                st.session_state[dst_key] = asb_result[src_key]
+                        # 石綿有無を自動設定
+                        if asb_result.get("asbestos_present"):
+                            st.session_state["_asb_present"] = asb_result["asbestos_present"]
+                        filled = sum(1 for v in asb_result.values() if v)
+                        st.success(f"石綿情報 {filled} 項目を読み取りました！")
+                        with st.expander("読み取り結果の詳細", expanded=False):
+                            for key, val in asb_result.items():
+                                if val:
+                                    label = ASBESTOS_FIELDS.get(key, key)
+                                    st.markdown(f"- **{label}**: {val}")
+                        st.rerun()
+                    else:
+                        st.error("石綿情報を読み取れませんでした。手動で入力してください。")
+                        with st.expander("エラー詳細"):
+                            st.code(asb_raw)
+        else:
+            st.info("Gemini APIキーが未設定のため、OCR機能は利用できません。手動で入力してください。")
+
+        # 石綿詳細フィールド（OCR結果 or 手動入力）
+        col_asb1, col_asb2 = st.columns(2)
+        with col_asb1:
+            asbestos_level = st.selectbox("石綿レベル", [
+                "",
+                "レベル1（吹付け材）",
+                "レベル2（保温材・断熱材等）",
+                "レベル3（成形板等）",
+            ], index=0, help="レベル1が最も飛散リスクが高い",
+               key="asbestos_level_select")
+            # OCR結果があればselectboxの初期値に反映
+            _ocr_level = st.session_state.get("_asb_level", "")
+            if _ocr_level and not asbestos_level:
+                st.caption(f"OCR読取値: {_ocr_level}")
+            asbestos_locations = st.text_input("石綿含有箇所",
+                value=st.session_state.get("_asb_locations", ""),
+                placeholder="外壁サイディング、屋根スレート",
+                help="カンマ区切りで複数箇所を入力")
+            asbestos_types = st.text_input("石綿の種類",
+                value=st.session_state.get("_asb_types", ""),
+                placeholder="クリソタイル",
+                help="検出された石綿の種類")
+        with col_asb2:
+            asbestos_survey_date = st.text_input("調査実施日",
+                value=st.session_state.get("_asb_survey_date", ""),
+                placeholder="令和8年2月15日")
+            asbestos_survey_company = st.text_input("調査機関名",
+                value=st.session_state.get("_asb_survey_company", ""),
+                placeholder="○○環境分析センター")
+            asbestos_surveyor = st.text_input("調査者名",
+                value=st.session_state.get("_asb_surveyor", ""),
+                placeholder="○○ ○○")
+            asbestos_area = st.text_input("石綿使用面積（㎡）",
+                value=st.session_state.get("_asb_area", ""),
+                placeholder="120.5")
 
         # --- 区ごとの動的チェックボックス ---
         _ward_for_cb = detected_ward if detected_ward else ""
@@ -1128,8 +1263,17 @@ with tab2:
 
         st.subheader("施工者")
         constructor_name = st.text_input("施工者名", value=_ocr_val("constructor_name"), placeholder="○○建設 株式会社", help=_field_help("constructor_name"))
+        constructor_address = st.text_input("施工者 住所", placeholder="東京都○○区○○1-1-1",
+                                             help="解体届出様式で必要な場合があります")
         constructor_tel = st.text_input("施工者 電話", value=_ocr_val("constructor_tel"), placeholder="03-1234-5678", help=_field_help("constructor_tel"))
         site_manager = st.text_input("現場責任者", value=_ocr_val("site_manager"), placeholder="○○ ○○", help=_field_help("site_manager"))
+
+        # 下請負人（解体工事で必要な場合）
+        if is_demolition:
+            with st.expander("下請負人情報（該当する場合）", expanded=False):
+                subcontractor_name = st.text_input("下請負人名", placeholder="○○解体工業")
+                subcontractor_address = st.text_input("下請負人 住所", placeholder="東京都○○区○○2-2-2")
+                subcontractor_tel = st.text_input("下請負人 電話", placeholder="03-9999-0000")
 
 with tab3:
     col1, col2 = st.columns(2)
@@ -1343,10 +1487,18 @@ if st.button("書類を一括生成", type="primary", use_container_width=True):
         "asbestos_removal_method": asbestos_removal_method or "",
         "transport_route": transport_route or "",
         "vehicle_route": vehicle_route or "",
-        "constructor_address": "",  # 施工者住所（将来フォーム追加可）
-        "subcontractor_name": "",
-        "subcontractor_address": "",
-        "subcontractor_tel": "",
+        "constructor_address": constructor_address or "",
+        "subcontractor_name": subcontractor_name if is_demolition else "",
+        "subcontractor_address": subcontractor_address if is_demolition else "",
+        "subcontractor_tel": subcontractor_tel if is_demolition else "",
+        # 石綿詳細
+        "asbestos_level": asbestos_level or "",
+        "asbestos_locations": asbestos_locations or "",
+        "asbestos_types": asbestos_types or "",
+        "asbestos_survey_date": asbestos_survey_date or "",
+        "asbestos_survey_company": asbestos_survey_company or "",
+        "asbestos_surveyor": asbestos_surveyor or "",
+        "asbestos_area": asbestos_area or "",
         # 解体用チェックボックス値
         "large_building_checks": large_building_checks,
         "explanation_method_checks": explanation_method_checks,
@@ -1376,8 +1528,15 @@ if st.button("書類を一括生成", type="primary", use_container_width=True):
                 building_pins=st.session_state.get("building_pins", []),
                 sign_pins=st.session_state.get("sign_pins", []),
             )
-            map_docx = os.path.join(tmpdir, "01_近隣説明範囲図.docx")
-            generate_map_document(data, map_png, map_docx, building_pins=st.session_state.get("building_pins", []))
+            if is_demolition:
+                map_docx = os.path.join(tmpdir, "01_解体工事現場案内図.docx")
+                generate_map_document(data, map_png, map_docx,
+                                      building_pins=st.session_state.get("building_pins", []),
+                                      title="解体工事現場案内図（標識設置位置図）")
+            else:
+                map_docx = os.path.join(tmpdir, "01_近隣説明範囲図.docx")
+                generate_map_document(data, map_png, map_docx,
+                                      building_pins=st.session_state.get("building_pins", []))
             progress.progress(25, text="標識設置届を生成中...")
 
             # 2. 標識設置届 or 解体書類
@@ -1388,10 +1547,15 @@ if st.button("書類を一括生成", type="primary", use_container_width=True):
             demolition_sign_path = None
             if is_demolition:
                 # 解体: お知らせ標識 + 事前周知報告書を生成
+                # テンプレートがxlsx/docxどちらかで出力される可能性がある
                 demolition_sign_path = os.path.join(tmpdir, "02_解体工事のお知らせ標識.docx")
-                generate_demolition_sign(data, demolition_sign_path)
+                result_sign = generate_demolition_sign(data, demolition_sign_path)
+                if result_sign and result_sign != demolition_sign_path:
+                    demolition_sign_path = result_sign  # xlsx等で出力された場合
                 demolition_report_path = os.path.join(tmpdir, "03_解体工事事前周知報告書.docx")
-                generate_demolition_report(data, demolition_report_path)
+                result_report = generate_demolition_report(data, demolition_report_path)
+                if result_report and result_report != demolition_report_path:
+                    demolition_report_path = result_report
             else:
                 sign_ext = ".xlsx" if tpl["sign_notice"] == "xlsx" else ".docx"
                 sign_path = os.path.join(tmpdir, f"02_標識設置届{sign_ext}")
@@ -1425,16 +1589,25 @@ if st.button("書類を一括生成", type="primary", use_container_width=True):
             progress.progress(100, text="完了！")
 
             # ZIPにまとめる
-            _zip_files = [
-                "01_近隣説明範囲図.docx",
-                "04_工事のお知らせ.docx",
-                "05_近隣施設一覧.txt",
-                "近隣説明範囲図.png",
-            ]
             if is_demolition:
-                _zip_files.insert(1, "02_解体工事のお知らせ標識.docx")
-                _zip_files.insert(2, "03_解体工事事前周知報告書.docx")
+                # 実際に生成されたファイル名を使用（xlsx/docx対応）
+                _sign_fname = os.path.basename(demolition_sign_path) if demolition_sign_path else "02_解体工事のお知らせ標識.docx"
+                _report_fname = os.path.basename(demolition_report_path) if demolition_report_path else "03_解体工事事前周知報告書.docx"
+                _zip_files = [
+                    "01_解体工事現場案内図.docx",
+                    _sign_fname,
+                    _report_fname,
+                    "04_工事のお知らせ.docx",
+                    "05_近隣施設一覧.txt",
+                    "近隣説明範囲図.png",
+                ]
             else:
+                _zip_files = [
+                    "01_近隣説明範囲図.docx",
+                    "04_工事のお知らせ.docx",
+                    "05_近隣施設一覧.txt",
+                    "近隣説明範囲図.png",
+                ]
                 sign_ext = ".xlsx" if tpl["sign_notice"] == "xlsx" else ".docx"
                 _zip_files.insert(1, f"02_標識設置届{sign_ext}")
                 report_ext = ".xlsx" if tpl["report"] == "xlsx" else ".docx"

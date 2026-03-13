@@ -12,7 +12,7 @@
 import os
 import re
 from docx import Document
-from docx.shared import Pt
+from docx.shared import Pt, Cm
 from docx.oxml.ns import qn
 
 try:
@@ -759,6 +759,865 @@ def fill_explanation_report(ward_name, data, output_path):
         if template:
             return _fill_docx_by_labels(template, config, data, output_path)
 
+    return None
+
+
+# ========== 解体工事テンプレート ==========
+
+# 解体用テンプレートディレクトリ名
+_DEMOLITION_SUBDIR = "demolition"
+
+
+def _find_demolition_template(ward_name, filename_pattern):
+    """解体用テンプレートファイルを検索"""
+    ward_dir = os.path.join(TEMPLATES_DIR, f"{ward_name}区", _DEMOLITION_SUBDIR)
+    if not os.path.isdir(ward_dir):
+        return None
+    for fname in os.listdir(ward_dir):
+        if not fname.endswith(".docx"):
+            continue
+        if filename_pattern in fname:
+            return os.path.join(ward_dir, fname)
+    return None
+
+
+def _set_paragraph_text(paragraph, text):
+    """段落のテキストを既存書式を保持しつつ置換"""
+    if paragraph.runs:
+        paragraph.runs[0].text = str(text)
+        for run in paragraph.runs[1:]:
+            run.text = ""
+    else:
+        run = paragraph.add_run(str(text))
+        run.font.name = "游ゴシック"
+        run._element.rPr.rFonts.set(qn("w:eastAsia"), "游ゴシック")
+        run.font.size = Pt(10)
+
+
+def _replace_checkbox(cell, mapping):
+    """セル内の□/☑チェックボックスを指定マッピングに従い置換
+
+    mapping: {"有": True, "無": False} のようなdict
+    □有 → ☑有, □無 → □無 (Trueの方に☑を付ける)
+    """
+    for p in cell.paragraphs:
+        combined = "".join(r.text for r in p.runs)
+        changed = combined
+        for label, checked in mapping.items():
+            if checked:
+                changed = changed.replace(f"□{label}", f"☑{label}")
+            else:
+                # 既に☑が付いていたら□に戻す
+                changed = changed.replace(f"☑{label}", f"□{label}")
+        if changed != combined:
+            for i, run in enumerate(p.runs):
+                run.text = changed if i == 0 else ""
+
+
+def _get_merged_cell(table, row_idx, col_idx):
+    """結合セルを考慮してセルを取得"""
+    return table.cell(row_idx, col_idx)
+
+
+# --- 足立区 第1号様式（解体工事のお知らせ標識）---
+
+def _set_run_font(run, size_pt=12, font_name="ＭＳ ゴシック", bold=False):
+    """runのフォントを設定"""
+    run.font.size = Pt(size_pt)
+    run.font.name = font_name
+    run._element.rPr.rFonts.set(qn("w:eastAsia"), font_name)
+    run.font.bold = bold
+
+
+def _fill_adachi_demolition_sign(template_path, data, output_path):
+    """足立区 解体工事のお知らせ標識（hp1gou）にデータ流し込み"""
+    doc = Document(template_path)
+
+    # .doc→.docx変換でページサイズがA4に縮小されている問題を修正
+    # 標識はA3縦（29.7cm x 42.0cm）で作成する規定
+    for section in doc.sections:
+        section.page_width = Cm(29.7)
+        section.page_height = Cm(42.0)
+        section.top_margin = Cm(2.0)
+        section.bottom_margin = Cm(2.0)
+        section.left_margin = Cm(3.0)
+        section.right_margin = Cm(3.0)
+
+    # ヘッダー段落を整理（P0に様式番号+注記を1行にまとめ、余分な空段落を削除）
+    while len(doc.paragraphs) > 1:
+        # P2以降の「A3版以上」テキストをP0に追記してから削除
+        p_last = doc.paragraphs[-1]
+        if p_last.text.strip():
+            # P0末尾に追記
+            doc.paragraphs[0].runs[-1].text += "　" + p_last.text.strip()
+        p_last._element.getparent().remove(p_last._element)
+        if len(doc.paragraphs) <= 1:
+            break
+    # P0のフォントをMS明朝12ptに統一
+    for run in doc.paragraphs[0].runs:
+        _set_run_font(run, 12, "ＭＳ 明朝")
+
+    if not doc.tables:
+        return None
+
+    table = doc.tables[0]
+
+    # --- A3に合わせて列幅・行高を調整 ---
+    from docx.shared import Emu
+    _col_widths = [Cm(6.3), Cm(9.2), Cm(9.7)]
+    for ci, col in enumerate(table.columns):
+        col.width = _col_widths[ci]
+    # 各行のセル幅も設定（python-docxの制約で列幅だけでは不十分）
+    for row in table.rows:
+        for ci, cell in enumerate(row.cells):
+            cell.width = _col_widths[ci]
+
+    _row_heights = [Cm(4.6), Cm(2.2), Cm(2.4), Cm(2.4), Cm(2.7),
+                    Cm(3.7), Cm(2.1), Cm(2.3), Cm(2.3), Cm(2.3)]
+    from docx.oxml.ns import qn as _qn
+    for ri, row in enumerate(table.rows):
+        row.height = _row_heights[ri]
+
+    # --- Row0: タイトル「解体工事のお知らせ」を50ptに ---
+    cell_title = _get_merged_cell(table, 0, 0)
+    for p in cell_title.paragraphs:
+        for run in p.runs:
+            _set_run_font(run, 50, "ＭＳ ゴシック", bold=False)
+
+    # --- Row6: 「お問合せ」を18pt太字に ---
+    cell_inquiry = _get_merged_cell(table, 6, 0)
+    for p in cell_inquiry.paragraphs:
+        for run in p.runs:
+            _set_run_font(run, 18, "ＭＳ ゴシック", bold=True)
+
+    # --- データ流し込み ---
+    site_address = data.get("site_address", "")
+    addr_local = site_address
+    for prefix in ["東京都足立区", "足立区"]:
+        if addr_local.startswith(prefix):
+            addr_local = addr_local[len(prefix):]
+            break
+
+    # Row1: 敷地の位置
+    cell_addr = _get_merged_cell(table, 1, 1)
+    _replace_in_cell(cell_addr, "足立区", f"足立区{addr_local}")
+
+    # Row2 Col1: 高さ
+    height = data.get("height", "")
+    if height:
+        cell_h = table.cell(2, 1)
+        for p in cell_h.paragraphs:
+            combined = "".join(r.text for r in p.runs)
+            if "高さ" in combined and "ｍ" in combined:
+                new_text = f"高さ\u3000{height}\u3000ｍ"
+                for i, run in enumerate(p.runs):
+                    run.text = new_text if i == 0 else ""
+                break
+
+    # Row2 Col2: 階数
+    floors_above = data.get("floors_above", "")
+    floors_below = data.get("floors_below", "")
+    cell_fl = table.cell(2, 2)
+    for p in cell_fl.paragraphs:
+        combined = "".join(r.text for r in p.runs)
+        if "地上" in combined and "地下" in combined:
+            new_text = f"階数　地上{floors_above}階/地下{floors_below}階"
+            for i, run in enumerate(p.runs):
+                run.text = new_text if i == 0 else ""
+            break
+
+    # Row3 Col1: 構造
+    structure = data.get("structure", "")
+    if structure:
+        cell_st = table.cell(3, 1)
+        for p in cell_st.paragraphs:
+            combined = "".join(r.text for r in p.runs)
+            if "構造" in combined:
+                new_text = f"構造\u3000{structure}"
+                for i, run in enumerate(p.runs):
+                    run.text = new_text if i == 0 else ""
+                break
+
+    # Row3 Col2: 床面積
+    total_area = data.get("total_floor_area", "")
+    if total_area:
+        cell_area = table.cell(3, 2)
+        for p in cell_area.paragraphs:
+            combined = "".join(r.text for r in p.runs)
+            if "床面積" in combined:
+                new_text = f"床面積\u3000{total_area}\u3000㎡"
+                for i, run in enumerate(p.runs):
+                    run.text = new_text if i == 0 else ""
+                break
+
+    # Row4: 工事予定期間
+    start_date = data.get("start_date", "")
+    end_date = data.get("end_date", "")
+    if start_date or end_date:
+        cell_period = _get_merged_cell(table, 4, 1)
+        for p in cell_period.paragraphs:
+            combined = "".join(r.text for r in p.runs)
+            if "年" in combined and "月" in combined:
+                new_text = f"{start_date} ～ {end_date}"
+                for i, run in enumerate(p.runs):
+                    run.text = new_text if i == 0 else ""
+                break
+
+    # Row5: 石綿等の状況（「有・無」→選択された方に○を付ける）
+    asbestos = data.get("asbestos_status", "")
+    cell_asb = _get_merged_cell(table, 5, 1)
+    if asbestos:
+        is_yes = asbestos in ["有り", "有"]
+        is_no = asbestos in ["無し", "無"]
+        for p in cell_asb.paragraphs:
+            combined = "".join(r.text for r in p.runs)
+            if "有" in combined and "無" in combined and "・" in combined:
+                if is_yes:
+                    new_text = combined.replace("有\u3000・\u3000無", "〇有\u3000・\u3000無")
+                elif is_no:
+                    new_text = combined.replace("有\u3000・\u3000無", "有\u3000・\u3000〇無")
+                else:
+                    new_text = combined
+                for i, run in enumerate(p.runs):
+                    run.text = new_text if i == 0 else ""
+                break
+
+    # Row7: 工事施工会社（会社名/住所/電話番号）
+    cell_company = _get_merged_cell(table, 7, 1)
+    paragraphs = cell_company.paragraphs
+    company_name = data.get("constructor_name", "")
+    company_addr = data.get("constructor_address", "")
+    company_tel = data.get("constructor_tel", "")
+    if len(paragraphs) >= 3:
+        for p in paragraphs:
+            combined = "".join(r.text for r in p.runs)
+            if "会社名" in combined and company_name:
+                new_text = f"会社名：{company_name}"
+                for i, run in enumerate(p.runs):
+                    run.text = new_text if i == 0 else ""
+            elif "所" in combined and "会社" not in combined and "電話" not in combined and company_addr:
+                new_text = f"住\u3000\u3000所：{company_addr}"
+                for i, run in enumerate(p.runs):
+                    run.text = new_text if i == 0 else ""
+            elif "電話番号" in combined and company_tel:
+                new_text = f"電話番号：{company_tel}"
+                for i, run in enumerate(p.runs):
+                    run.text = new_text if i == 0 else ""
+
+    # Row8: 現場責任者（氏名/電話）
+    cell_manager = _get_merged_cell(table, 8, 1)
+    manager_name = data.get("site_manager", "")
+    manager_tel = data.get("constructor_tel", "")
+    if manager_name:
+        _replace_in_cell(cell_manager, "現場責任者氏名：", f"現場責任者氏名：{manager_name}")
+    if manager_tel:
+        for p in cell_manager.paragraphs:
+            combined = "".join(r.text for r in p.runs)
+            if "日中連絡" in combined and "電話番号" in combined:
+                new_text = combined.replace("電話番号：", f"電話番号：{manager_tel}")
+                for i, run in enumerate(p.runs):
+                    run.text = new_text if i == 0 else ""
+                break
+
+    # Row9: 標識設置年月日（12ptに統一）
+    sign_date = data.get("sign_install_date", "")
+    if sign_date:
+        cell_sign = _get_merged_cell(table, 9, 1)
+        for p in cell_sign.paragraphs:
+            combined = "".join(r.text for r in p.runs)
+            if "年" in combined and "月" in combined and "日" in combined:
+                # 日付プレースホルダーを実際の日付に置換
+                new_text = combined
+                # 「　　 年　　 月　　 日　　」部分を日付で置換
+                import re as _re
+                new_text = _re.sub(
+                    r'[\s　]*年[\s　]*月[\s　]*日[\s　]*',
+                    sign_date + "　",
+                    new_text, count=1)
+                for i, run in enumerate(p.runs):
+                    run.text = new_text if i == 0 else ""
+                    _set_run_font(run, 12, "ＭＳ ゴシック")
+                break
+
+    doc.save(output_path)
+    return output_path
+
+
+# --- 足立区 第2号様式（建築物解体工事事前周知報告書）---
+
+def _fill_adachi_demolition_report(template_path, data, output_path):
+    """足立区 解体工事事前周知報告書（hphoukoku）にデータ流し込み"""
+    doc = Document(template_path)
+
+    # .doc→.docx変換でマージンが大きすぎてテーブルがはみ出す問題を修正
+    # テーブル幅17.2cm → 左右マージンを狭めて収める
+    for section in doc.sections:
+        section.left_margin = Cm(1.5)
+        section.right_margin = Cm(1.5)
+
+    # --- 段落フィールド ---
+    # P3: 日付、P8: 発注者氏名、P9: 住所、P10: 電話番号
+    for i, p in enumerate(doc.paragraphs):
+        text = p.text.strip()
+        # 日付行（「年　　月　　日」）
+        if "年" in text and "月" in text and "日" in text and i < 6:
+            submit_date = data.get("submit_date", "")
+            if submit_date:
+                _set_paragraph_text(p, f"　　　　　　　　　　　　　　　　　　　　　　　　{submit_date}")
+        # 発注者氏名
+        elif "発注者等の氏名" in text:
+            name = data.get("applicant_name", "")
+            if name:
+                _set_paragraph_text(p, f"　　　　　　　　発注者等の氏名　{name}")
+        # 住所
+        elif text.startswith("住") and "所" in text and i > 6:
+            addr = data.get("applicant_address", "")
+            if addr:
+                _set_paragraph_text(p, f"　　　　　　　　住　　所　{addr}")
+        # 電話番号
+        elif "電話番号" in text:
+            tel = data.get("applicant_tel", "")
+            if tel:
+                _set_paragraph_text(p, f"　　　　　　　　電話番号　{tel}")
+
+    if not doc.tables:
+        doc.save(output_path)
+        return output_path
+
+    table = doc.tables[0]
+    site_address = data.get("site_address", "")
+    addr_local = site_address
+    for prefix in ["東京都足立区", "足立区"]:
+        if addr_local.startswith(prefix):
+            addr_local = addr_local[len(prefix):]
+            break
+
+    # Row0: 工事の名称
+    site_name = data.get("site_name", "")
+    if site_name:
+        cell = _get_merged_cell(table, 0, 2)
+        _set_cell_text(cell, site_name)
+
+    # Row1: 所在地（「足立区」の後に住所）
+    cell_addr = _get_merged_cell(table, 1, 2)
+    _replace_in_cell(cell_addr, "足立区", f"足立区{addr_local}")
+
+    # Row2: 工事期間
+    start_date = data.get("start_date", "")
+    end_date = data.get("end_date", "")
+    if start_date or end_date:
+        cell_period = _get_merged_cell(table, 2, 2)
+        for p in cell_period.paragraphs:
+            combined = "".join(r.text for r in p.runs)
+            if "年" in combined:
+                new_text = f"{start_date} ～ {end_date}"
+                for i, run in enumerate(p.runs):
+                    run.text = new_text if i == 0 else ""
+                break
+
+    # Row3: 施工者（住所/氏名/電話）
+    cell_contractor = _get_merged_cell(table, 3, 2)
+    c_name = data.get("constructor_name", "")
+    c_addr = data.get("constructor_address", "")
+    c_tel = data.get("constructor_tel", "")
+    for p in cell_contractor.paragraphs:
+        combined = "".join(r.text for r in p.runs)
+        if "住所" in combined:
+            new_text = f"住所　{c_addr}"
+            for i, run in enumerate(p.runs):
+                run.text = new_text if i == 0 else ""
+        elif "氏名" in combined:
+            new_text = f"氏名　{c_name}　電話（{c_tel}）"
+            for i, run in enumerate(p.runs):
+                run.text = new_text if i == 0 else ""
+
+    # Row4: 解体建築物の概要（Col3: 床面積、Col5: 構造・階数）
+    total_area = data.get("total_floor_area", "")
+    if total_area:
+        cell_area = table.cell(4, 3)
+        _set_cell_text(cell_area, f"{total_area}㎡")
+    structure = data.get("structure", "")
+    floors_above = data.get("floors_above", "")
+    floors_below = data.get("floors_below", "")
+    struct_text = structure
+    if floors_above or floors_below:
+        struct_text += f"　地上{floors_above}階"
+        if floors_below:
+            struct_text += f"/地下{floors_below}階"
+    if struct_text:
+        cell_struct = table.cell(4, 5)
+        _set_cell_text(cell_struct, struct_text)
+
+    # Row5: 石綿の使用状況（□有 □無 → ☑/□）
+    asbestos = data.get("asbestos_status", "")
+    if asbestos:
+        cell_asb = _get_merged_cell(table, 5, 2)
+        _replace_checkbox(cell_asb, {
+            "有": asbestos in ["有り", "有"],
+            "無": asbestos in ["無し", "無"],
+        })
+
+    # Row6: 報告事項（□標識設置 □近隣の方への説明）
+    # デフォルトで両方チェック
+    cell_report = _get_merged_cell(table, 6, 2)
+    _replace_checkbox(cell_report, {
+        "標識設置": True,
+        "近隣の方への説明": True,
+    })
+
+    # Row7: 標識設置年月日
+    sign_date = data.get("sign_install_date", "")
+    if sign_date:
+        cell_sign = _get_merged_cell(table, 7, 2)
+        for p in cell_sign.paragraphs:
+            combined = "".join(r.text for r in p.runs)
+            if "標識設置年月日" in combined:
+                new_text = f"標識設置年月日　{sign_date}"
+                for i, run in enumerate(p.runs):
+                    run.text = new_text if i == 0 else ""
+                break
+
+    # Row8: 説明実施方法（□説明会 □戸別説明）
+    method_checks = data.get("explanation_method_checks", [])
+    if not method_checks:
+        method = data.get("explanation_method", "")
+        if "説明会" in method:
+            method_checks.append("説明会")
+        if "個別訪問" in method or "戸別" in method:
+            method_checks.append("戸別説明")
+    cell_method = _get_merged_cell(table, 8, 2)
+    _replace_checkbox(cell_method, {
+        "説明会": "説明会" in method_checks,
+        "戸別説明": "戸別説明" in method_checks or "個別訪問" in method_checks,
+    })
+
+    # Row9: 説明時期
+    explanation_date = data.get("explanation_date", "")
+    if explanation_date:
+        cell_explain = _get_merged_cell(table, 9, 2)
+        for p in cell_explain.paragraphs:
+            combined = "".join(r.text for r in p.runs)
+            if "説明時期" in combined or "年" in combined:
+                new_text = f"説明時期　{explanation_date}"
+                for i, run in enumerate(p.runs):
+                    run.text = new_text if i == 0 else ""
+                break
+
+    _remove_seal_marks(doc)
+    doc.save(output_path)
+    return output_path
+
+
+# --- 汎用解体テンプレートフィラー ---
+
+def _prepare_demolition_data(data):
+    """解体用のデータを準備（共通前処理）"""
+    d = _prepare_data(data)
+    d["construction_year"] = data.get("construction_year", "")
+    d["renovation_history"] = data.get("renovation_history", "")
+    d["demolition_method"] = data.get("demolition_method", "")
+    d["asbestos_status"] = data.get("asbestos_status", "")
+    d["asbestos_removal_method"] = data.get("asbestos_removal_method", "")
+    d["transport_route"] = data.get("transport_route", "")
+    d["vehicle_route"] = data.get("vehicle_route", "")
+    d["constructor_address"] = data.get("constructor_address", "")
+    d["subcontractor_name"] = data.get("subcontractor_name", "")
+    d["subcontractor_address"] = data.get("subcontractor_address", "")
+    d["subcontractor_tel"] = data.get("subcontractor_tel", "")
+    d["asbestos_level"] = data.get("asbestos_level", "")
+    d["asbestos_locations"] = data.get("asbestos_locations", "")
+    d["asbestos_types"] = data.get("asbestos_types", "")
+    d["asbestos_survey_date"] = data.get("asbestos_survey_date", "")
+    d["asbestos_survey_company"] = data.get("asbestos_survey_company", "")
+    d["asbestos_surveyor"] = data.get("asbestos_surveyor", "")
+    d["asbestos_area"] = data.get("asbestos_area", "")
+    if d["start_date"] or d["end_date"]:
+        d["period_text"] = f"{d['start_date']} ～ {d['end_date']}"
+    else:
+        d["period_text"] = ""
+    d["applicant_info"] = d["applicant_name"]
+    if d["applicant_address"]:
+        d["applicant_info"] = f"{d['applicant_address']}　{d['applicant_name']}"
+    parts = [p for p in [d["constructor_address"], d["constructor_name"]] if p]
+    if d["constructor_tel"]:
+        parts.append(f"TEL: {d['constructor_tel']}")
+    d["constructor_full"] = "　".join(parts)
+    return d
+
+
+def _fill_demolition_docx_by_labels(template_path, label_map, data, output_path,
+                                     table_index=0, page_size=None, margins=None):
+    """Word解体テンプレートにラベル検索方式でデータを流し込む（汎用）"""
+    doc = Document(template_path)
+    fill_data = _prepare_demolition_data(data)
+    if page_size:
+        for section in doc.sections:
+            section.page_width = Cm(page_size[0])
+            section.page_height = Cm(page_size[1])
+    if margins:
+        for section in doc.sections:
+            if "left" in margins:
+                section.left_margin = Cm(margins["left"])
+            if "right" in margins:
+                section.right_margin = Cm(margins["right"])
+            if "top" in margins:
+                section.top_margin = Cm(margins["top"])
+            if "bottom" in margins:
+                section.bottom_margin = Cm(margins["bottom"])
+    table = doc.tables[table_index] if table_index < len(doc.tables) else None
+    if not table:
+        doc.save(output_path)
+        return output_path
+    for label_pattern, field_name in label_map:
+        value = fill_data.get(field_name, "")
+        if not value:
+            continue
+        for ri, row in enumerate(table.rows):
+            found = False
+            for cell in row.cells:
+                if re.search(label_pattern, cell.text):
+                    found = True
+                    break
+            if not found:
+                continue
+            cells = list(row.cells)
+            label_cells = set()
+            for ci, cell in enumerate(cells):
+                if re.search(label_pattern, cell.text):
+                    label_cells.add(ci)
+            wrote = False
+            for ci, cell in enumerate(cells):
+                if ci in label_cells:
+                    continue
+                if ci > 0 and cell._element is cells[ci - 1]._element:
+                    continue
+                t = cell.text.strip()
+                if t and ("電" in t or "㎡" in t):
+                    continue
+                if _cell_is_empty(cell):
+                    _set_cell_text(cell, value)
+                    wrote = True
+                    break
+            if wrote:
+                break
+    # 段落内の日付・届出者置換
+    for i, p in enumerate(doc.paragraphs):
+        text = p.text.strip()
+        if "年" in text and "月" in text and "日" in text and i < 6:
+            sd = fill_data.get("submit_date", "")
+            if sd and not any(c.isdigit() for c in text):
+                _set_paragraph_text(p, f"\u3000" * 24 + sd)
+        elif "発注者" in text and "氏名" in text:
+            name = fill_data.get("applicant_name", "")
+            if name:
+                _set_paragraph_text(p, text.replace("氏名", f"氏名　{name}"))
+    _remove_seal_marks(doc)
+    doc.save(output_path)
+    return output_path
+
+
+def _xlsx_find_master_cell(ws, cell_ref):
+    """結合セルの場合、書き込み可能なマスターセルを返す"""
+    from openpyxl.cell.cell import MergedCell
+    cell = ws[cell_ref]
+    if not isinstance(cell, MergedCell):
+        return cell
+    # 結合範囲からマスターセルを探す
+    for merged_range in ws.merged_cells.ranges:
+        if cell.coordinate in merged_range:
+            return ws.cell(row=merged_range.min_row, column=merged_range.min_col)
+    return cell
+
+
+def _fill_demolition_xlsx(template_path, cell_map, data, output_path, sheet_name=None):
+    """Excel解体テンプレートにセル座標方式でデータを流し込む（汎用）"""
+    if not openpyxl:
+        return None
+    if not os.path.exists(template_path):
+        return None
+    wb = openpyxl.load_workbook(template_path)
+    ws = wb[sheet_name] if sheet_name and sheet_name in wb.sheetnames else wb.active
+    fill_data = _prepare_demolition_data(data)
+    for cell_ref, field_name in cell_map.items():
+        value = fill_data.get(field_name, "")
+        if value:
+            cell = _xlsx_find_master_cell(ws, cell_ref)
+            cell.value = value
+    for row in ws.iter_rows():
+        for cell in row:
+            if cell.value and isinstance(cell.value, str) and "印" in cell.value:
+                cell.value = cell.value.replace("　印", "").replace("印", "")
+    wb.save(output_path)
+    return output_path
+
+
+def _find_demolition_template_xlsx(ward_name, filename_pattern):
+    """解体用Excelテンプレートファイルを検索"""
+    ward_dir = os.path.join(TEMPLATES_DIR, f"{ward_name}区", _DEMOLITION_SUBDIR)
+    if not os.path.isdir(ward_dir):
+        return None
+    for fname in os.listdir(ward_dir):
+        if not fname.endswith(".xlsx"):
+            continue
+        if filename_pattern in fname:
+            return os.path.join(ward_dir, fname)
+    return None
+
+
+# --- 解体テンプレート メインAPI ---
+
+DEMOLITION_TEMPLATE_CONFIGS = {
+    "足立": {
+        "sign": {"filename": "hp1gou_3", "filler": "custom", "func": "_fill_adachi_demolition_sign"},
+        "report": {"filename": "hphoukoku_4", "filler": "custom", "func": "_fill_adachi_demolition_report"},
+    },
+    "新宿": {
+        "sign": {"filename": "標識_第1号様式", "filler": "docx", "labels": [
+            (r"工事の名称|工事名称", "site_name"), (r"工\s*期|工事予定期間", "period_text"),
+            (r"標識設置年月日", "sign_install_date")]},
+        "report": {"filename": "報告書_第2号様式", "filler": "docx", "labels": [
+            (r"工事の名称", "site_name"), (r"所\s*在\s*地|敷地", "site_address"),
+            (r"標識設置年月日", "sign_install_date"), (r"説明.*時期|説明.*日", "explanation_date")]},
+    },
+    "文京": {
+        "sign": {"filename": "標識", "filler": "docx", "labels": [
+            (r"解体工事の名称|工事の名称", "site_name"), (r"工事期間|工\s*期", "period_text"),
+            (r"標識設置年月日", "sign_install_date")]},
+        "report": {"filename": "報告書", "filler": "docx", "labels": [
+            (r"工事の名称", "site_name"), (r"所\s*在\s*地|敷地", "site_address"),
+            (r"施工者", "constructor_name"), (r"現場責任者", "site_manager"),
+            (r"標識設置年月日", "sign_install_date"), (r"説明.*時期|説明.*日", "explanation_date")]},
+    },
+    "台東": {
+        "sign": {"filename": "標識_様式1", "filler": "docx", "labels": [
+            (r"解体工事の名称|工事の名称", "site_name"), (r"敷地.*位置|所\s*在\s*地", "site_address"),
+            (r"解体工事期間|工\s*期", "period_text"), (r"標識設置年月日", "sign_install_date")]},
+        "report": {"filename": "報告書_様式2", "filler": "docx", "labels": [
+            (r"工事の名称", "site_name"), (r"所\s*在\s*地|敷地", "site_address"),
+            (r"施工者", "constructor_name"), (r"標識設置年月日", "sign_install_date"),
+            (r"説明.*時期|説明.*日", "explanation_date")]},
+    },
+    "墨田": {
+        "sign": {"filename": "標識_第1号様式", "filler": "docx", "labels": [
+            (r"解体.*名称|工事の名称", "site_name"), (r"敷地.*位置|所\s*在\s*地", "site_address"),
+            (r"元請.*業者|工事施工者", "constructor_full"), (r"解体工事期間|工\s*期", "period_text"),
+            (r"標識設置年月日", "sign_install_date")]},
+        "report": {"filename": "報告書_第2号様式", "filler": "docx", "labels": [
+            (r"工事の名称", "site_name"), (r"所\s*在\s*地|敷地", "site_address"),
+            (r"標識設置年月日", "sign_install_date"), (r"説明.*時期|説明.*日", "explanation_date")]},
+    },
+    "江東": {
+        "sign": {"filename": "標識_第1号様式", "filler": "docx", "labels": [
+            (r"名\s*称", "site_name"), (r"所\s*在\s*地", "site_address"),
+            (r"解体等工事期間|工\s*期", "period_text"), (r"標識設置年月日", "sign_install_date")]},
+        "report": {"filename": "報告書_第2号様式", "filler": "docx", "labels": [
+            (r"工事の名称", "site_name"), (r"所\s*在\s*地|敷地", "site_address"),
+            (r"施工者", "constructor_name"), (r"標識設置年月日", "sign_install_date"),
+            (r"説明.*時期|説明.*日", "explanation_date")]},
+    },
+    "品川": {
+        "sign": {"filename": "標識_第1号様式", "filler": "docx", "labels": [
+            (r"敷地.*所在地|所\s*在\s*地", "site_address"), (r"事業主|発注者", "applicant_info"),
+            (r"工\s*期|工事予定期間", "period_text"), (r"標識設置年月日", "sign_install_date")]},
+        "report": {"filename": "説明会報告_第5号様式", "filler": "docx", "labels": [
+            (r"工事の名称", "site_name"), (r"所\s*在\s*地|敷地", "site_address"),
+            (r"標識設置年月日", "sign_install_date")]},
+    },
+    "大田": {
+        "sign": {"filename": "標識_第1号様式", "filler": "docx", "labels": [
+            (r"工事の場所|所\s*在\s*地", "site_address"), (r"事業主|発注者", "applicant_info"),
+            (r"工\s*期|工事予定期間", "period_text"), (r"標識設置年月日", "sign_install_date")]},
+        "report": {"filename": "報告書_第2号様式", "filler": "docx", "labels": [
+            (r"工事の名称", "site_name"), (r"所\s*在\s*地|敷地", "site_address"),
+            (r"施工者", "constructor_name"), (r"標識設置年月日", "sign_install_date"),
+            (r"説明.*時期|説明.*日", "explanation_date")]},
+    },
+    "世田谷": {
+        "sign": {"filename": "第1_2_3号様式", "filler": "docx", "table_index": 0, "labels": [
+            (r"工事の名称", "site_name"), (r"敷地.*位置|所\s*在\s*地", "site_address"),
+            (r"事業主|発注者", "applicant_info"), (r"施工者|元請", "constructor_full"),
+            (r"工\s*期|工事予定期間", "period_text"), (r"標識設置年月日", "sign_install_date")]},
+    },
+    "渋谷": {
+        "sign": {"filename": "標識_第2号様式", "filler": "docx", "labels": [
+            (r"解体工事の名称|工事の名称", "site_name"), (r"敷地.*位置|所\s*在\s*地", "site_address"),
+            (r"解体工事の工期|工\s*期", "period_text"), (r"標識設置年月日", "sign_install_date")]},
+        "report": {"filename": "説明会報告書_第5号様式", "filler": "docx", "labels": [
+            (r"工事の名称", "site_name"), (r"所\s*在\s*地|敷地", "site_address"),
+            (r"標識設置年月日", "sign_install_date")]},
+    },
+    "中野": {
+        "sign": {"filename": "標識", "filler": "docx", "labels": [
+            (r"解体工事の名称|工事の名称", "site_name"), (r"敷地.*位置|所\s*在\s*地", "site_address"),
+            (r"工事施工者|施工者", "constructor_full"), (r"工\s*期|工事予定期間", "period_text"),
+            (r"標識設置年月日", "sign_install_date")]},
+    },
+    "北": {
+        "sign": {"filename": "標識_第1号様式", "filler": "docx", "labels": [
+            (r"敷地.*位置|住居表示", "site_address"), (r"事業主|発注者", "applicant_info"),
+            (r"工事予定期間|工\s*期", "period_text"), (r"標識設置年月日", "sign_install_date")]},
+        "report": {"filename": "説明会報告書_第3号様式", "filler": "docx", "labels": [
+            (r"工事の名称", "site_name"), (r"所\s*在\s*地|敷地", "site_address"),
+            (r"標識設置年月日", "sign_install_date"), (r"説明.*時期|説明.*日", "explanation_date")]},
+    },
+    "荒川": {
+        "sign": {"filename": "標識", "filler": "docx", "labels": [
+            (r"解体工事の名称|工事の名称", "site_name"), (r"敷地.*位置|所\s*在\s*地", "site_address"),
+            (r"工事予定期間|工\s*期", "period_text"), (r"標識設置年月日", "sign_install_date")]},
+        "report": {"filename": "報告書", "filler": "docx", "labels": [
+            (r"工事の名称", "site_name"), (r"所\s*在\s*地|敷地", "site_address"),
+            (r"標識設置年月日", "sign_install_date")]},
+    },
+    "千代田": {
+        "sign": {"filename": "標識_第1号様式", "filler": "xlsx", "sheet": "◎標識", "cells": {
+            "E7": "site_name", "E8": "site_address", "E11": "applicant_address",
+            "E12": "applicant_name", "E13": "constructor_address", "E14": "constructor_name",
+            "E19": "asbestos_survey_date", "D28": "constructor_address",
+            "D29": "site_manager", "D30": "constructor_tel"}},
+        "report": {"filename": "報告書_第2号様式", "filler": "docx", "labels": [
+            (r"工事の名称", "site_name"), (r"所\s*在\s*地|敷地", "site_address"),
+            (r"施工者", "constructor_name"), (r"標識設置年月日", "sign_install_date"),
+            (r"説明.*時期|説明.*日", "explanation_date")]},
+    },
+    "中央": {
+        "sign": {"filename": "標識_第1号様式", "filler": "xlsx", "sheet": "１号様式", "cells": {
+            "E7": "site_name", "E8": "applicant_address", "E9": "applicant_name",
+            "E10": "constructor_address", "E11": "constructor_name", "H12": "site_address",
+            "E28": "constructor_address", "E29": "site_manager"}},
+        "report": {"filename": "説明会報告_第3号様式", "filler": "xlsx", "sheet": "３号様式 ", "cells": {
+            "N8": "applicant_address", "N10": "applicant_name",
+            "E12": "site_name", "H13": "site_address"}},
+    },
+    "港": {
+        "sign": {"filename": "標識_第2号様式", "filler": "xlsx", "sheet": "Sheet1", "cells": {
+            "D9": "site_name", "D13": "applicant_address", "D15": "applicant_name",
+            "D27": "constructor_address", "D28": "site_manager", "D29": "constructor_tel"}},
+        "report": {"filename": "説明会報告書_第4号様式", "filler": "xlsx", "sheet": "Sheet1", "cells": {
+            "C14": "site_name", "C18": "constructor_address", "C19": "constructor_name"}},
+    },
+    "杉並": {
+        "sign": {"filename": "標識", "filler": "xlsx", "sheet": "工事看板", "cells": {
+            "E5": "site_name", "K5": "site_address", "K11": "constructor_name",
+            "K14": "constructor_address", "K20": "constructor_tel",
+            "K22": "site_manager", "K23": "constructor_tel"}},
+    },
+    "豊島": {
+        "sign": {"filename": "標識_お知らせ", "filler": "xlsx", "cells": {
+            "E5": "site_name", "E6": "site_address"}},
+    },
+    "葛飾": {
+        "sign": {"filename": "標識_お知らせ", "filler": "xlsx",
+                 "sheet": "石綿未使用 (ひな形) ", "cells": {
+            "E9": "site_name", "E14": "constructor_name", "E15": "constructor_address"}},
+        "report": {"filename": "報告書様式", "filler": "xlsx", "cells": {
+            "E5": "site_name", "E6": "site_address"}},
+    },
+    "練馬": {
+        "sign": {"filename": "標識様式例", "filler": "xlsx", "cells": {
+            "D5": "site_name", "D6": "site_address"}},
+        "report": {"filename": "住民説明実施報告書", "filler": "docx", "labels": [
+            (r"工事の名称", "site_name"), (r"所\s*在\s*地|敷地", "site_address"),
+            (r"施工者", "constructor_name"), (r"標識設置年月日", "sign_install_date"),
+            (r"説明.*時期|説明.*日", "explanation_date")]},
+    },
+    "江戸川": {
+        "sign": {"filename": "標識_アスベストなし", "filler": "xlsx",
+                 "sheet": "レベル3 届出不要・石綿なし(白紙)", "cells": {
+            "E6": "site_name", "F8": "constructor_name", "F11": "constructor_address",
+            "F14": "site_manager", "F15": "constructor_tel"}},
+    },
+    "目黒": {
+        "sign": {"filename": "標識設置届_作成補助ツール", "filler": "xlsx", "cells": {
+            "D5": "site_name", "D6": "site_address"}},
+    },
+}
+
+_DEMOLITION_FILLERS = {
+    "_fill_adachi_demolition_sign": _fill_adachi_demolition_sign,
+    "_fill_adachi_demolition_report": _fill_adachi_demolition_report,
+}
+
+
+def get_available_demolition_templates(ward_name):
+    """指定区で利用可能な解体テンプレートの種類を返す"""
+    result = {"sign": None, "report": None}
+    config = DEMOLITION_TEMPLATE_CONFIGS.get(ward_name)
+    if not config:
+        return result
+    for doc_type in ("sign", "report"):
+        cfg = config.get(doc_type)
+        if not cfg:
+            continue
+        ft = cfg.get("filler", "")
+        if ft == "docx" or ft == "custom":
+            tpl = _find_demolition_template(ward_name, cfg["filename"])
+            if tpl:
+                result[doc_type] = "docx"
+        elif ft == "xlsx":
+            tpl = _find_demolition_template_xlsx(ward_name, cfg["filename"])
+            if tpl:
+                result[doc_type] = "xlsx"
+    return result
+
+
+def fill_demolition_sign(ward_name, data, output_path):
+    """解体工事のお知らせ標識を公式テンプレートで生成"""
+    config = DEMOLITION_TEMPLATE_CONFIGS.get(ward_name)
+    if not config or "sign" not in config:
+        return None
+    cfg = config["sign"]
+    ft = cfg.get("filler", "")
+    if ft == "custom":
+        tpl = _find_demolition_template(ward_name, cfg["filename"])
+        if not tpl:
+            return None
+        func = _DEMOLITION_FILLERS.get(cfg.get("func"))
+        return func(tpl, data, output_path) if func else None
+    elif ft == "docx":
+        tpl = _find_demolition_template(ward_name, cfg["filename"])
+        if not tpl:
+            return None
+        return _fill_demolition_docx_by_labels(
+            tpl, cfg["labels"], data, output_path,
+            table_index=cfg.get("table_index", 0),
+            page_size=cfg.get("page_size"), margins=cfg.get("margins"))
+    elif ft == "xlsx":
+        tpl = _find_demolition_template_xlsx(ward_name, cfg["filename"])
+        if not tpl:
+            return None
+        if output_path.endswith(".docx"):
+            output_path = output_path.replace(".docx", ".xlsx")
+        return _fill_demolition_xlsx(tpl, cfg["cells"], data, output_path, sheet_name=cfg.get("sheet"))
+    return None
+
+
+def fill_demolition_report(ward_name, data, output_path):
+    """解体工事事前周知報告書を公式テンプレートで生成"""
+    config = DEMOLITION_TEMPLATE_CONFIGS.get(ward_name)
+    if not config or "report" not in config:
+        return None
+    cfg = config["report"]
+    ft = cfg.get("filler", "")
+    if ft == "custom":
+        tpl = _find_demolition_template(ward_name, cfg["filename"])
+        if not tpl:
+            return None
+        func = _DEMOLITION_FILLERS.get(cfg.get("func"))
+        return func(tpl, data, output_path) if func else None
+    elif ft == "docx":
+        tpl = _find_demolition_template(ward_name, cfg["filename"])
+        if not tpl:
+            return None
+        return _fill_demolition_docx_by_labels(
+            tpl, cfg["labels"], data, output_path,
+            table_index=cfg.get("table_index", 0), margins=cfg.get("margins"))
+    elif ft == "xlsx":
+        tpl = _find_demolition_template_xlsx(ward_name, cfg["filename"])
+        if not tpl:
+            return None
+        if output_path.endswith(".docx"):
+            output_path = output_path.replace(".docx", ".xlsx")
+        return _fill_demolition_xlsx(tpl, cfg["cells"], data, output_path, sheet_name=cfg.get("sheet"))
     return None
 
 

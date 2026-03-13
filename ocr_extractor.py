@@ -164,3 +164,107 @@ def extract_from_file(file_bytes, file_name, mime_type=None):
         return {}, f"JSON解析エラー: {e}\n\n生のレスポンス:\n{raw_text}"
     except Exception as e:
         return {}, f"Gemini APIエラー: {e}"
+
+
+# ========== 石綿（アスベスト）事前調査結果からの抽出 ==========
+
+ASBESTOS_FIELDS = {
+    "asbestos_present": "石綿含有の有無（有り / 無し / みなし）",
+    "asbestos_level": "石綿レベル（レベル1: 吹付け材 / レベル2: 保温材等 / レベル3: 成形板等）",
+    "asbestos_locations": "石綿が検出された箇所（例: 外壁サイディング、屋根スレート、天井吹付け材）",
+    "asbestos_types": "石綿の種類（例: クリソタイル、アモサイト、クロシドライト）",
+    "asbestos_survey_date": "調査日（例: 令和8年2月15日）",
+    "asbestos_survey_company": "調査機関名（例: ○○環境分析センター）",
+    "asbestos_surveyor": "調査者名",
+    "asbestos_removal_method": "除去・処理方法（例: 湿潤化して手作業で除去）",
+    "asbestos_area": "石綿使用面積（㎡）",
+    "building_construction_year": "建物の竣工年・築年数",
+    "building_structure_type": "建物の構造（例: RC造、S造、木造）",
+}
+
+_ASBESTOS_SYSTEM_PROMPT = """あなたは石綿（アスベスト）事前調査結果報告書の読み取りAIです。
+アップロードされた書類から石綿に関する情報を正確に抽出してください。
+
+以下のJSON形式で出力してください。読み取れない項目は空文字""にしてください。
+推測や創作は絶対にしないでください。書類に明記されている情報のみを抽出してください。
+
+出力フォーマット（JSON）:
+"""
+
+
+def extract_asbestos_info(file_bytes, file_name, mime_type=None):
+    """石綿事前調査結果報告書から情報を抽出
+
+    Args:
+        file_bytes: ファイルのバイト列
+        file_name: ファイル名
+        mime_type: MIMEタイプ
+
+    Returns:
+        dict: 抽出された石綿情報
+        str: 生テキスト（デバッグ用）
+    """
+    if not genai:
+        return {}, "google-generativeai パッケージが未インストールです"
+
+    api_key = _get_api_key()
+    if not api_key:
+        return {}, "GEMINI_API_KEY が設定されていません"
+
+    genai.configure(api_key=api_key)
+
+    if not mime_type:
+        ext = os.path.splitext(file_name)[1].lower()
+        mime_map = {
+            ".pdf": "application/pdf",
+            ".png": "image/png",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".webp": "image/webp",
+        }
+        mime_type = mime_map.get(ext, "application/octet-stream")
+
+    fields_json = json.dumps(
+        {k: "" for k in ASBESTOS_FIELDS},
+        ensure_ascii=False,
+        indent=2,
+    )
+    fields_desc = "\n".join(
+        [f'  "{k}": {v}' for k, v in ASBESTOS_FIELDS.items()]
+    )
+
+    prompt = (
+        _ASBESTOS_SYSTEM_PROMPT
+        + fields_json
+        + "\n\n各フィールドの説明:\n"
+        + fields_desc
+        + "\n\nこの石綿調査報告書から読み取れる情報をJSON形式で出力してください。JSONのみを出力し、それ以外のテキストは出力しないでください。"
+    )
+
+    try:
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        file_part = {"mime_type": mime_type, "data": file_bytes}
+        response = model.generate_content([prompt, file_part])
+
+        raw_text = response.text.strip()
+
+        json_text = raw_text
+        if "```json" in json_text:
+            json_text = json_text.split("```json")[1].split("```")[0].strip()
+        elif "```" in json_text:
+            json_text = json_text.split("```")[1].split("```")[0].strip()
+
+        extracted = json.loads(json_text)
+
+        result = {}
+        for key in ASBESTOS_FIELDS:
+            val = extracted.get(key, "")
+            if val and isinstance(val, str):
+                result[key] = val.strip()
+
+        return result, raw_text
+
+    except json.JSONDecodeError as e:
+        return {}, f"JSON解析エラー: {e}\n\n生のレスポンス:\n{raw_text}"
+    except Exception as e:
+        return {}, f"Gemini APIエラー: {e}"

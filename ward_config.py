@@ -127,6 +127,10 @@ WARD_CONFIG = {
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "large_building", "explanation_method", "attachments", "rodent_control"],
             "extra_explanation_items": ["ねずみ生息状況・駆除対策"],
+            "template_urls": {
+                "sign": "https://www.city.chiyoda.lg.jp/documents/10138/hyoshiki-1_2.xlsx",
+                "report": "https://www.city.chiyoda.lg.jp/documents/10138/hokokusho-2_6.docx",
+            },
         },
     },
     "中央": {
@@ -152,6 +156,11 @@ WARD_CONFIG = {
             "submit_copies": 2,
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "explanation_method", "attachments"],
+            "template_urls": {
+                "sign": "https://www.city.chuo.lg.jp/documents/5191/4_1gouyousikikaitai.xls",
+                "sign_report": "https://www.city.chuo.lg.jp/documents/5191/2gouyousikikaitai.xls",
+                "report": "https://www.city.chuo.lg.jp/documents/5191/3gouyousikikaitai.xls",
+            },
         },
     },
     "港": {
@@ -177,6 +186,11 @@ WARD_CONFIG = {
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "explanation_method", "attachments"],
             "electronic_only": True,
+            "template_urls": {
+                "sign": "https://www.city.minato.tokyo.jp/documents/7366/hyousikie.xlsx",
+                "sign_report": "https://www.city.minato.tokyo.jp/documents/124155/4hyousikie.xlsx",
+                "report": "https://www.city.minato.tokyo.jp/documents/7368/7setumeie.xlsx",
+            },
         },
     },
     "新宿": {
@@ -201,6 +215,11 @@ WARD_CONFIG = {
             "submit_copies": 2,
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "large_building", "explanation_method", "attachments", "specific_construction"],
+            "template_urls": {
+                "sign": "https://www.city.shinjuku.lg.jp/content/000392254.docx",
+                "report": "https://www.city.shinjuku.lg.jp/content/000392365.docx",
+                "asbestos_sign": "https://www.city.shinjuku.lg.jp/content/000391585.xlsx",
+            },
         },
     },
     "文京": {
@@ -228,6 +247,10 @@ WARD_CONFIG = {
             "submit_copies": 2,
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "explanation_method", "attachments"],
+            "template_urls": {
+                "sign": "https://www.city.bunkyo.lg.jp/documents/4872/hyousiki_1.docx",
+                "report": "https://www.city.bunkyo.lg.jp/documents/4872/houkokusyo_1.docx",
+            },
         },
     },
     "台東": {
@@ -252,6 +275,10 @@ WARD_CONFIG = {
             "submit_copies": 2,
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "explanation_method", "attachments"],
+            "template_urls": {
+                "sign": "https://www.city.taito.lg.jp/kenchiku/kankyohozen/kogaitaisaku/jizenshuchi/kaitaikoji.files/hyoushiki.2022.8.1.doc",
+                "report": "https://www.city.taito.lg.jp/kenchiku/kankyohozen/kogaitaisaku/jizenshuchi/kaitaikoji.files/houkokusyo.2022.8.1.doc",
+            },
         },
     },
     "墨田": {
@@ -277,6 +304,11 @@ WARD_CONFIG = {
             "submit_copies": 2,
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "large_building", "explanation_method", "attachments"],
+            "template_urls": {
+                "sign": "https://www.city.sumida.lg.jp/matizukuri/kentiku/kouji/kaitaisshidouyoukou.files/1gouyousiki.docx",
+                "report": "https://www.city.sumida.lg.jp/matizukuri/kentiku/kouji/kaitaisshidouyoukou.files/2gou.docx",
+                "change": "https://www.city.sumida.lg.jp/matizukuri/kentiku/kouji/kaitaisshidouyoukou.files/3gou.docx",
+            },
         },
     },
     "江東": {
@@ -302,6 +334,11 @@ WARD_CONFIG = {
             "submit_copies": 2,
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "large_building", "explanation_method", "attachments"],
+            "template_urls": {
+                "sign": "https://www.city.koto.lg.jp/395108/machizukuri/kenchiku/kowasu/documents/01kaitai-hyoushiki.doc",
+                "report": "https://www.city.koto.lg.jp/395108/machizukuri/kenchiku/kowasu/documents/02kaitai-houkokusho.doc",
+                "report_xlsx": "https://www.city.koto.lg.jp/395108/machizukuri/kenchiku/kowasu/documents/houkokusho.xlsx",
+            },
         },
     },
     "品川": {
@@ -327,6 +364,11 @@ WARD_CONFIG = {
             "submit_copies": 2,
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "large_building", "explanation_method", "attachments"],
+            "template_urls": {
+                "sign": "https://www.city.shinagawa.tokyo.jp/ct/other000026300/yousiki_1.doc",
+                "sign_report": "https://www.city.shinagawa.tokyo.jp/contentshozon2019/yousiki2.doc",
+                "report": "https://www.city.shinagawa.tokyo.jp/contentshozon2019/yousiki5.doc",
+            },
         },
     },
     "目黒": {
@@ -351,6 +393,9 @@ WARD_CONFIG = {
             "submit_copies": 2,
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "explanation_method", "attachments"],
+            "template_urls": {
+                "sign_tool": "https://www.city.meguro.tokyo.jp/documents/6114/kaitaitodokehojyo260130.xlsx",
+            },
         },
     },
     "大田": {
@@ -378,6 +423,10 @@ WARD_CONFIG = {
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "large_building", "explanation_method", "attachments"],
             "report_optional_small": True,
+            "template_urls": {
+                "sign": "https://www.city.ota.tokyo.jp/seikatsu/sumaimachinami/kenchiku/kensetsurecycle.files/hyousiki.doc",
+                "report": "https://www.city.ota.tokyo.jp/seikatsu/sumaimachinami/kenchiku/kensetsurecycle.files/zizennsyuutihoukokusyo.doc",
+            },
         },
     },
     "世田谷": {
@@ -402,6 +451,9 @@ WARD_CONFIG = {
             "submit_copies": 2,
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "specific_construction", "explanation_method", "attachments"],
+            "template_urls": {
+                "all_forms": "https://www.city.setagaya.lg.jp/documents/4817/03.doc",
+            },
         },
     },
     "渋谷": {
@@ -429,6 +481,12 @@ WARD_CONFIG = {
             "submit_copies": 2,
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "large_building", "explanation_method", "attachments"],
+            "template_urls": {
+                "plan": "https://files.city.shibuya.tokyo.jp/assets/12995aba8b194961be709ba879857f70/1faa0854550e487482afdeb64a0af96e/kaitai1.docx",
+                "sign": "https://files.city.shibuya.tokyo.jp/assets/12995aba8b194961be709ba879857f70/224558543aa24364b86fa02849613058/kaitai3.docx",
+                "sign_report": "https://files.city.shibuya.tokyo.jp/assets/12995aba8b194961be709ba879857f70/a4c29799e4f44510ba490c83f87704fd/assets_kankyo_000055158.docx",
+                "report": "https://files.city.shibuya.tokyo.jp/assets/12995aba8b194961be709ba879857f70/bdb92d74b725482f948e45d6c7e625ea/assets_kankyo_000055160.docx",
+            },
         },
     },
     "中野": {
@@ -453,6 +511,9 @@ WARD_CONFIG = {
             "submit_copies": 2,
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "explanation_method", "attachments", "rodent_control"],
+            "template_urls": {
+                "sign": "https://www.city.tokyo-nakano.lg.jp/machizukuri/kenchiku/tetsuzuki/kaitai/kaitaikoji.files/youshiki.doc",
+            },
         },
     },
     "杉並": {
@@ -477,6 +538,10 @@ WARD_CONFIG = {
             "submit_copies": 2,
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "explanation_method", "attachments"],
+            "template_urls": {
+                "plan": "https://www.city.suginami.tokyo.jp/documents/8562/shinkaitai-1.doc",
+                "sign": "https://www.city.suginami.tokyo.jp/documents/8562/kanban2.xlsx",
+            },
         },
     },
     "豊島": {
@@ -500,6 +565,9 @@ WARD_CONFIG = {
             "submit_to": "環境保全課 公害対策グループ（届出不要・相談のみ）",
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "explanation_method"],
+            "template_urls": {
+                "sign": "https://www.city.toshima.lg.jp/documents/7999/kaitaioshirase_1.xlsx",
+            },
         },
     },
     "北": {
@@ -524,6 +592,11 @@ WARD_CONFIG = {
             "submit_copies": 2,
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "large_building", "explanation_method", "attachments"],
+            "template_urls": {
+                "sign": "https://www.city.kita.lg.jp/_res/projects/default_project/_page_/001/009/342/attachment_3.doc",
+                "sign_report": "https://www.city.kita.lg.jp/_res/projects/default_project/_page_/001/009/342/attachment_4.doc",
+                "report": "https://www.city.kita.lg.jp/_res/projects/default_project/_page_/001/009/342/attachment_5.doc",
+            },
         },
     },
     "荒川": {
@@ -551,6 +624,11 @@ WARD_CONFIG = {
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "large_building", "explanation_method", "attachments", "meeting_required"],
             "electronic_only": True,
+            "template_urls": {
+                "sign": "https://www.city.arakawa.tokyo.jp/documents/3188/hyoushikiyoushiki.doc",
+                "report": "https://www.city.arakawa.tokyo.jp/documents/3188/houkokushoyoushiki.doc",
+                "change": "https://www.city.arakawa.tokyo.jp/documents/3188/henkouyoushiki.doc",
+            },
         },
     },
     "板橋": {
@@ -575,6 +653,7 @@ WARD_CONFIG = {
             "submit_copies": 2,
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "explanation_method", "attachments"],
+            "template_urls": {},
         },
     },
     "練馬": {
@@ -599,6 +678,11 @@ WARD_CONFIG = {
             "submit_copies": 2,
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "explanation_method", "attachments"],
+            "template_urls": {
+                "sign": "https://www.city.nerima.tokyo.jp/dl/shigoto/jigyo/youshiki.files/keiji-yoshikirei.xlsx",
+                "sign_report": "https://www.city.nerima.tokyo.jp/dl/shigoto/jigyo/youshiki.files/ku-yoshiki3-20240716.docx",
+                "report": "https://www.city.nerima.tokyo.jp/dl/shigoto/jigyo/youshiki.files/ku-yoshiki4-20220401.doc",
+            },
         },
     },
     "足立": {
@@ -657,6 +741,10 @@ WARD_CONFIG = {
             "submit_copies": 2,
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "explanation_method", "attachments"],
+            "template_urls": {
+                "sign": "https://www.city.katsushika.lg.jp/_res/projects/default_project/_page_/001/003/961/2taibouhoukeiji.xlsx",
+                "report": "https://www.city.katsushika.lg.jp/_res/projects/default_project/_page_/001/003/961/20250402youshiki.xls",
+            },
         },
     },
     "江戸川": {
@@ -681,6 +769,11 @@ WARD_CONFIG = {
             "submit_copies": 2,
             "asbestos_required": True,
             "checkbox_groups": ["asbestos", "specific_construction", "explanation_method", "attachments"],
+            "template_urls": {
+                "sign_level12": "https://www.city.edogawa.tokyo.jp/documents/1237/keijiban_level1or2.xlsx",
+                "sign_level3": "https://www.city.edogawa.tokyo.jp/documents/1237/keijibanrei_level3.xlsx",
+                "sign_no_asbestos": "https://www.city.edogawa.tokyo.jp/documents/1237/keijibanrei_non_asubest.xlsx",
+            },
         },
     },
 

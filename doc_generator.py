@@ -18,6 +18,8 @@ from docx.oxml.ns import qn
 from ward_config import get_ward_config, get_demolition_checkboxes, DEMOLITION_CHECKBOX_DEFS
 from template_filler import fill_sign_notice as _fill_official_sign_notice
 from template_filler import fill_explanation_report as _fill_official_report
+from template_filler import fill_demolition_sign as _fill_official_demolition_sign
+from template_filler import fill_demolition_report as _fill_official_demolition_report
 
 
 # ========== ユーティリティ ==========
@@ -179,10 +181,17 @@ def generate_sign_notice(data, output_path):
 # ========== 1a. 解体工事のお知らせ標識（足立区 第1号様式準拠） ==========
 
 def generate_demolition_sign(data, output_path):
-    """解体工事のお知らせ標識を生成（足立区 別記第1号様式準拠）
-    A3版以上の看板に記載する内容をWord文書として出力する。
+    """解体工事のお知らせ標識を生成
+    公式テンプレートがある区はそちらを使用、なければ自作生成
     """
     ward_name = data.get("ward_name", "")
+
+    # 公式テンプレートがあればそちらを使用
+    official = _fill_official_demolition_sign(ward_name, data, output_path)
+    if official:
+        return official
+
+    # フォールバック: 自作Word生成
     wc = get_ward_config(ward_name)
     demo_cfg = wc.get("demolition", {})
 
@@ -279,8 +288,17 @@ def _merge_cells_and_set(table, row1, col1, row2, col2, text, font_size=10, bold
 
 
 def generate_demolition_report(data, output_path):
-    """解体工事 事前周知報告書を生成（実際の区様式に準拠）"""
+    """解体工事 事前周知報告書を生成
+    公式テンプレートがある区はそちらを使用、なければ自作生成
+    """
     ward_name = data.get("ward_name", "")
+
+    # 公式テンプレートがあればそちらを使用
+    official = _fill_official_demolition_report(ward_name, data, output_path)
+    if official:
+        return official
+
+    # フォールバック: 自作Word生成
     wc = get_ward_config(ward_name)
     suffix = wc.get("suffix", "区長").replace("長", "")  # "区長"→"区", "市長"→"市"
 
@@ -715,8 +733,8 @@ def generate_construction_notice(data, output_path):
 
 # ========== 4. 近隣説明範囲図（Word版） ==========
 
-def generate_map_document(data, map_png_path, output_path, building_pins=None):
-    """近隣説明範囲図をWord文書として生成（地図画像埋め込み + 建物リスト）"""
+def generate_map_document(data, map_png_path, output_path, building_pins=None, title=None):
+    """近隣説明範囲図／解体工事現場案内図をWord文書として生成（地図画像埋め込み + 建物リスト）"""
     doc = Document()
     section = doc.sections[0]
     section.page_width = Cm(29.7)  # A4横
@@ -726,7 +744,8 @@ def generate_map_document(data, map_png_path, output_path, building_pins=None):
     section.left_margin = Cm(2.0)
     section.right_margin = Cm(2.0)
 
-    _add_heading_paragraph(doc, "近 隣 説 明 範 囲 図", font_size=18)
+    heading_text = title or "近 隣 説 明 範 囲 図"
+    _add_heading_paragraph(doc, heading_text, font_size=18)
     _add_body_paragraph(doc, "", space_after=4)
 
     # 地図画像
