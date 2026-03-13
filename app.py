@@ -12,24 +12,31 @@ import io
 import sys
 import zipfile
 import tempfile
+import traceback
 import streamlit as st
-import folium
-from folium import Circle, Marker, DivIcon
-from streamlit_folium import st_folium
 
-sys.path.insert(0, os.path.dirname(__file__))
-from geocoder import geocode, extract_ward, extract_ward_with_suffix
-from map_generator import generate_map_png, _calc_zoom, TILE_PROVIDERS
-from nearby_search import search_nearby, format_nearby_list
-from doc_generator import (
-    generate_sign_notice,
-    generate_explanation_report,
-    generate_demolition_report,
-    generate_demolition_sign,
-    generate_construction_notice,
-    generate_map_document,
-)
-from ward_config import get_demolition_checkboxes
+try:
+    import folium
+    from folium import Circle, Marker, DivIcon
+    from streamlit_folium import st_folium
+
+    sys.path.insert(0, os.path.dirname(__file__))
+    from geocoder import geocode, extract_ward, extract_ward_with_suffix
+    from map_generator import generate_map_png, _calc_zoom, TILE_PROVIDERS
+    from nearby_search import search_nearby, format_nearby_list
+    from doc_generator import (
+        generate_sign_notice,
+        generate_explanation_report,
+        generate_demolition_report,
+        generate_demolition_sign,
+        generate_construction_notice,
+        generate_map_document,
+    )
+    from ward_config import get_demolition_checkboxes
+except Exception as e:
+    st.error(f"起動エラー: {type(e).__name__}: {e}")
+    st.code(traceback.format_exc())
+    st.stop()
 
 # ========== ページ設定 ==========
 st.set_page_config(
