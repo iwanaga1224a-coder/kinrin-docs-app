@@ -794,6 +794,36 @@ def _set_paragraph_text(paragraph, text):
         run.font.size = Pt(10)
 
 
+def _insert_value_after_keyword(runs, keywords, value):
+    """キーワードを含むrunを探し、その後ろに値を挿入（run書式保持）"""
+    if len(runs) == 1:
+        # runs=1: テキスト末尾に値を追加
+        runs[0].text = runs[0].text.rstrip() + f"　{value}"
+        return
+    # runs>=2: キーワードを含むrunを後ろから探す
+    keyword_idx = -1
+    for kw in keywords:
+        for ri in range(len(runs) - 1, -1, -1):
+            if kw in runs[ri].text:
+                keyword_idx = ri
+                break
+        if keyword_idx >= 0:
+            break
+    if keyword_idx >= 0 and keyword_idx + 1 < len(runs):
+        # キーワードrunの次のrunに値を入れる
+        runs[keyword_idx + 1].text = f"　{value}"
+    elif keyword_idx >= 0:
+        # キーワードrunが最後 → そこに追加
+        runs[keyword_idx].text = runs[keyword_idx].text.rstrip() + f"　{value}"
+    else:
+        # キーワード不明 → 最後の空白runに入れる
+        for ri in range(len(runs) - 1, -1, -1):
+            if not runs[ri].text.strip():
+                runs[ri].text = f"　{value}"
+                return
+        runs[-1].text += f"　{value}"
+
+
 def _replace_checkbox(cell, mapping):
     """セル内の□/☑チェックボックスを指定マッピングに従い置換
 
@@ -1302,17 +1332,59 @@ def _fill_demolition_docx_by_labels(template_path, label_map, data, output_path,
                     break
             if wrote:
                 break
-    # 段落内の日付・届出者置換
-    for i, p in enumerate(doc.paragraphs):
+    # 段落内の日付・届出者・住所・電話置換（run書式を保持）
+    filled_date = False
+    filled_addr = False
+    filled_name = False
+    filled_tel = False
+    for i, p in enumerate(doc.paragraphs[:20]):
         text = p.text.strip()
-        if "年" in text and "月" in text and "日" in text and i < 6:
+        runs = p.runs
+        if not runs:
+            continue
+        # 要綱・規定を含む本文行はスキップ
+        if "要綱" in text or "規定" in text or "報告します" in text:
+            continue
+        # 日付行（「年　　月　　日」）
+        if not filled_date and "年" in text and "月" in text and "日" in text:
             sd = fill_data.get("submit_date", "")
-            if sd and not any(c.isdigit() for c in text):
-                _set_paragraph_text(p, f"\u3000" * 24 + sd)
-        elif "発注者" in text and "氏名" in text:
+            if not sd:
+                continue
+            if len(text) < 30:
+                # 短い行: 日付のみ（数字が既にある場合=記入済みなのでスキップ）
+                if not any(c.isdigit() for c in text):
+                    runs[0].text = "\u3000" * 20 + sd
+                    for r in runs[1:]:
+                        r.text = ""
+                    filled_date = True
+            else:
+                # 長い行（様式情報と混在）: 末尾の「年 月 日」部分だけ置換
+                rt = runs[-1].text
+                for idx in range(len(rt) - 1, -1, -1):
+                    if rt[idx] == "年":
+                        rest = rt[idx:]
+                        if "月" in rest and "日" in rest:
+                            runs[-1].text = rt[:idx] + sd
+                            filled_date = True
+                            break
+        # 住所行（「住所」「住　所」を含む行、「所在地」は除外）
+        elif not filled_addr and ("住" in text and "所" in text) and "所在地" not in text and i > 3:
+            addr = fill_data.get("applicant_address", "")
+            if addr:
+                _insert_value_after_keyword(runs, ["所", "住所"], addr)
+                filled_addr = True
+        # 氏名行（「氏名」「氏　名」を含む行、「代表者の氏名」は除外）
+        elif not filled_name and ("氏" in text and "名" in text) and "代表者" not in text and i > 3:
             name = fill_data.get("applicant_name", "")
             if name:
-                _set_paragraph_text(p, text.replace("氏名", f"氏名　{name}"))
+                _insert_value_after_keyword(runs, ["名", "氏名"], name)
+                filled_name = True
+        # 電話・連絡先行
+        elif not filled_tel and ("電話" in text or "連絡先" in text) and i > 3:
+            tel = fill_data.get("applicant_tel", "")
+            if tel:
+                _insert_value_after_keyword(runs, ["電話", "連絡先"], tel)
+                filled_tel = True
     _remove_seal_marks(doc)
     doc.save(output_path)
     return output_path
