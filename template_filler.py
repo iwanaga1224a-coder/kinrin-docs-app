@@ -1057,28 +1057,30 @@ def _fill_adachi_demolition_report(template_path, data, output_path):
 
     # --- 段落フィールド ---
     # P3: 日付、P8: 発注者氏名、P9: 住所、P10: 電話番号
+    # ラベル(R0)を残してR1に値を入れる方式でフォーマットを保持
     for i, p in enumerate(doc.paragraphs):
         text = p.text.strip()
-        # 日付行（「年　　月　　日」）
+        runs = p.runs
+        # P3: 日付行（「年　　月　　日」）
         if "年" in text and "月" in text and "日" in text and i < 6:
             submit_date = data.get("submit_date", "")
             if submit_date:
-                _set_paragraph_text(p, f"　　　　　　　　　　　　　　　　　　　　　　　　{submit_date}")
-        # 発注者氏名
-        elif "発注者等の氏名" in text:
+                runs[0].text = f"　　　　　　　　　　　　　　　　　　　　{submit_date}"
+        # P8: 発注者氏名（R0=ラベル, R1=空白→名前を入れる）
+        elif "発注者等の氏名" in text and len(runs) >= 2:
             name = data.get("applicant_name", "")
             if name:
-                _set_paragraph_text(p, f"　　　　　　　　発注者等の氏名　{name}")
-        # 住所
-        elif text.startswith("住") and "所" in text and i > 6:
+                runs[1].text = f"　{name}"
+        # P9: 住所（R0=ラベル, R1=空白→住所を入れる）
+        elif text.startswith("住") and "所" in text and i > 6 and len(runs) >= 2:
             addr = data.get("applicant_address", "")
             if addr:
-                _set_paragraph_text(p, f"　　　　　　　　住　　所　{addr}")
-        # 電話番号
-        elif "電話番号" in text:
+                runs[1].text = f"　{addr}"
+        # P10: 電話番号（R0=ラベル, R1=空白→電話を入れる）
+        elif "電話番号" in text and len(runs) >= 2:
             tel = data.get("applicant_tel", "")
             if tel:
-                _set_paragraph_text(p, f"　　　　　　　　電話番号　{tel}")
+                runs[1].text = f"　{tel}"
 
     if not doc.tables:
         doc.save(output_path)

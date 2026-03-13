@@ -248,40 +248,63 @@ from ocr_extractor import is_available as ocr_available, extract_from_file, extr
 
 with st.expander("📄 書類をアップロードして自動入力", expanded=False):
     st.caption(
-        "建築確認申請書・工事看板の写真・契約書などをアップロードすると、"
-        "システムが自動で読み取りフォームに入力します。入力後に手動で修正もできます。"
+        "現場書類・石綿調査報告書・工事看板の写真などをアップロードすると、"
+        "現場情報と石綿情報をまとめて読み取りフォームに自動入力します。"
     )
     if not ocr_available():
         st.warning("⚠️ Gemini APIキーが設定されていないため、この機能は利用できません。")
     else:
-        uploaded_file = st.file_uploader(
-            "PDF・画像ファイルをアップロード",
+        uploaded_files = st.file_uploader(
+            "PDF・画像ファイルをアップロード（複数可）",
             type=["pdf", "png", "jpg", "jpeg", "webp", "bmp", "tiff"],
             key="ocr_upload",
+            accept_multiple_files=True,
         )
-        if uploaded_file is not None:
+        if uploaded_files:
             if st.button("📖 読み取り開始", type="primary"):
-                with st.spinner("システムが書類情報を整理中...（10〜20秒）"):
-                    file_bytes = uploaded_file.read()
-                    extracted, raw = extract_from_file(
-                        file_bytes, uploaded_file.name, uploaded_file.type
-                    )
-                if extracted:
-                    # session_stateに保存 → 各フォームのdefault値として使用
-                    for key, val in extracted.items():
-                        if val:
-                            st.session_state[f"_ocr_{key}"] = val
-                    filled_count = sum(1 for v in extracted.values() if v)
-                    st.success(f"✅ {filled_count} 項目を読み取りました！下のフォームに自動入力されています。")
-                    with st.expander("読み取り結果の詳細", expanded=False):
+                total_filled = 0
+                all_details = {}
+                for uf in uploaded_files:
+                    file_bytes = uf.read()
+                    # 現場情報の読み取り
+                    with st.spinner(f"{uf.name} から現場情報を読み取り中..."):
+                        extracted, raw = extract_from_file(file_bytes, uf.name, uf.type)
+                    if extracted:
                         for key, val in extracted.items():
                             if val:
-                                label = EXTRACT_FIELDS.get(key, key)
-                                st.markdown(f"- **{label}**: {val}")
+                                st.session_state[f"_ocr_{key}"] = val
+                                all_details[EXTRACT_FIELDS.get(key, key)] = val
+                                total_filled += 1
+                    # 石綿情報の読み取り（同じファイルから）
+                    with st.spinner(f"{uf.name} から石綿情報を読み取り中..."):
+                        asb_result, asb_raw = extract_asbestos_info(file_bytes, uf.name, uf.type)
+                    if asb_result:
+                        _asb_map = {
+                            "asbestos_level": "_asb_level",
+                            "asbestos_locations": "_asb_locations",
+                            "asbestos_types": "_asb_types",
+                            "asbestos_survey_date": "_asb_survey_date",
+                            "asbestos_survey_company": "_asb_survey_company",
+                            "asbestos_surveyor": "_asb_surveyor",
+                            "asbestos_removal_method": "_asb_removal_method",
+                            "asbestos_area": "_asb_area",
+                            "building_construction_year": "_asb_construction_year",
+                        }
+                        for src_key, dst_key in _asb_map.items():
+                            if asb_result.get(src_key):
+                                st.session_state[dst_key] = asb_result[src_key]
+                                all_details[ASBESTOS_FIELDS.get(src_key, src_key)] = asb_result[src_key]
+                                total_filled += 1
+                        if asb_result.get("asbestos_present"):
+                            st.session_state["_asb_present"] = asb_result["asbestos_present"]
+                if total_filled > 0:
+                    st.success(f"✅ {total_filled} 項目を読み取りました！下のフォームに自動入力されています。")
+                    with st.expander("読み取り結果の詳細", expanded=False):
+                        for label, val in all_details.items():
+                            st.markdown(f"- **{label}**: {val}")
+                    st.rerun()
                 else:
-                    st.error("読み取れませんでした。")
-                    with st.expander("エラー詳細"):
-                        st.code(raw)
+                    st.error("読み取れませんでした。手動で入力してください。")
 
 def _ocr_val(field_id, fallback=""):
     """OCRで読み取った値があればそれを返す（手動入力で上書き可）"""
@@ -1094,60 +1117,10 @@ with tab1:
             vehicle_route = st.text_input("工事車両通行経路", placeholder="○○通り→△△交差点→□□通り",
                                           help="標識に記載")
 
-        # --- 石綿事前調査結果アップロード ---
+        # --- 石綿詳細フィールド（上部のOCRで読み取り or 手動入力） ---
         st.markdown("---")
         st.markdown("**石綿（アスベスト）事前調査結果**")
-        st.caption(
-            "石綿事前調査結果報告書（PDF・画像）をアップロードすると、"
-            "OCRで石綿情報を自動抽出してフォームに入力します。手動入力も可能です。"
-        )
-        if ocr_available():
-            asbestos_file = st.file_uploader(
-                "石綿事前調査結果報告書",
-                type=["pdf", "png", "jpg", "jpeg", "webp"],
-                key="asbestos_upload",
-                help="大気汚染防止法に基づく石綿事前調査結果報告書をアップロード",
-            )
-            if asbestos_file is not None:
-                if st.button("石綿情報を読み取る", key="asbestos_ocr_btn"):
-                    with st.spinner("石綿調査報告書を読み取り中...（10〜20秒）"):
-                        asb_bytes = asbestos_file.read()
-                        asb_result, asb_raw = extract_asbestos_info(
-                            asb_bytes, asbestos_file.name, asbestos_file.type
-                        )
-                    if asb_result:
-                        # session_stateに保存してフォームに反映
-                        _asb_map = {
-                            "asbestos_level": "_asb_level",
-                            "asbestos_locations": "_asb_locations",
-                            "asbestos_types": "_asb_types",
-                            "asbestos_survey_date": "_asb_survey_date",
-                            "asbestos_survey_company": "_asb_survey_company",
-                            "asbestos_surveyor": "_asb_surveyor",
-                            "asbestos_removal_method": "_asb_removal_method",
-                            "asbestos_area": "_asb_area",
-                            "building_construction_year": "_asb_construction_year",
-                        }
-                        for src_key, dst_key in _asb_map.items():
-                            if asb_result.get(src_key):
-                                st.session_state[dst_key] = asb_result[src_key]
-                        # 石綿有無を自動設定
-                        if asb_result.get("asbestos_present"):
-                            st.session_state["_asb_present"] = asb_result["asbestos_present"]
-                        filled = sum(1 for v in asb_result.values() if v)
-                        st.success(f"石綿情報 {filled} 項目を読み取りました！")
-                        with st.expander("読み取り結果の詳細", expanded=False):
-                            for key, val in asb_result.items():
-                                if val:
-                                    label = ASBESTOS_FIELDS.get(key, key)
-                                    st.markdown(f"- **{label}**: {val}")
-                        st.rerun()
-                    else:
-                        st.error("石綿情報を読み取れませんでした。手動で入力してください。")
-                        with st.expander("エラー詳細"):
-                            st.code(asb_raw)
-        else:
-            st.info("Gemini APIキーが未設定のため、OCR機能は利用できません。手動で入力してください。")
+        st.caption("上部の「書類をアップロードして自動入力」から石綿調査報告書を読み込めます。手動入力も可能です。")
 
         # 石綿詳細フィールド（OCR結果 or 手動入力）
         col_asb1, col_asb2 = st.columns(2)
