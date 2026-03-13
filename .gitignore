@@ -2,7 +2,14 @@ __pycache__/
 *.pyc
 .env
 *.png
-*.docx
 *.zip
 output/
 .streamlit/secrets.toml
+
+# docx/xlsxはルート直下のみ無視（テンプレートは追跡する）
+/*.docx
+/*.xlsx
+
+# テンプレートは追跡する
+!templates/**/*.docx
+!templates/**/*.xlsx
