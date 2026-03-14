@@ -9,9 +9,6 @@ import time
 import tempfile
 import folium
 from folium import Circle, Marker, DivIcon
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
 
 
 def _calc_zoom(radius_m, zoom_offset=0):
@@ -220,6 +217,10 @@ def generate_map_html(site_name, address, lat, lng, radius_m=50, zoom_override=N
 
 def html_to_png(html_path, png_path, width=1200, height=900):
     """ヘッドレスChromeでHTMLをスクリーンショット→PNGに保存"""
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.chrome.service import Service
+
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--disable-gpu")
